@@ -53,3 +53,27 @@ export interface NavigationItem {
   label: string;
   badge?: number;
 }
+
+export interface StaffProfile {
+  name: string;
+  short: string;
+  role: string;
+  nip: string;
+  initials: string;
+}
+
+export interface StaffDashboardMetric {
+  label: string;
+  value: string;
+  delta: string;
+  tone: string;
+}
+
+export interface StaffActivityItem {
+  who: string;
+  what: string;
+  doc: string;
+  when: string;
+  status: "approved" | "review" | "pending" | "rejected" | "delegated" | "waiting";
+}
+

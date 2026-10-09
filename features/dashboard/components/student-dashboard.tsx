@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
 import { FilterStatus, Letter, NavigationItem, UserProfile } from "../types";
 import { SummaryCards } from "./summary-cards";
 import { AttentionSection } from "./attention-section";
@@ -378,6 +379,14 @@ export default function StudentDashboard() {
                     <div className="text-[11px] text-slate-500 font-mono mt-0.5">
                       {mockProfile.nrp} · {mockProfile.prodi}
                     </div>
+                  </div>
+                  <div className="border-b border-slate-100 py-1">
+                    <Link
+                      href="/manajemen"
+                      className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-xs text-slate-700 hover:bg-slate-50 transition font-medium cursor-pointer"
+                    >
+                      <span>Beralih ke Portal Staf & Manajemen</span>
+                    </Link>
                   </div>
                   <button
                     type="button"

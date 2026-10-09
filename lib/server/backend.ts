@@ -1,11 +1,18 @@
-import { toApiError } from "@/lib/api/errors";
-
-const DEFAULT_BASE_URL = "http://localhost:5217";
+import { ApiError, toApiError } from "@/lib/api/errors";
 
 export function backendBaseUrl(): string {
-  const configured = process.env.SIGNIT_API_BASE_URL?.trim();
-  const base = configured && configured.length > 0 ? configured : DEFAULT_BASE_URL;
-  return base.replace(/\/+$/, "");
+  const configured = process.env.BACKEND_URL?.trim();
+  if (!configured) {
+    throw new ApiError(503, "backend_configuration_missing", "BACKEND_URL belum dikonfigurasi pada frontend.", null);
+  }
+  try {
+    const base = new URL(configured);
+    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password
+      || base.pathname !== "/" || base.search || base.hash) throw new Error("invalid_origin");
+    return base.origin;
+  } catch {
+    throw new ApiError(503, "backend_configuration_invalid", "BACKEND_URL harus berupa URL HTTP/HTTPS lengkap tanpa /api/v1.", null);
+  }
 }
 
 export interface BackendRequestOptions {

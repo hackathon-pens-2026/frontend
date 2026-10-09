@@ -10,11 +10,11 @@ Konfigurasi yang dibutuhkan (server-only, jangan pakai prefix `NEXT_PUBLIC_`):
 
 | Variabel | Contoh | Keterangan |
 |---|---|---|
-| `SIGNIT_API_BASE_URL` | `http://localhost:5217` | Base URL backend, tanpa `/api/v1` |
+| `BACKEND_URL` | Wajib diisi | Base URL backend HTTP/HTTPS, tanpa `/api/v1`; hanya dibaca server |
 
-- Lokal: buat `.env.local` berisi `SIGNIT_API_BASE_URL=http://localhost:5217`
+- Frontend lokal: gunakan `BACKEND_URL=http://signit.indonesiacentral.cloudapp.azure.com:8080` untuk mengakses backend Azure langsung.
   (backend `dotnet run --launch-profile http`).
-- Deployment (Vercel): set `SIGNIT_API_BASE_URL` ke URL HTTPS backend publik.
+- Deployment (Vercel): set `BACKEND_URL` ke URL backend publik dan redeploy. Gunakan HTTPS setelah TLS backend tersedia.
 - Route terproteksi: `proxy.ts` mengarahkan pengunjung tanpa cookie sesi ke
   `/login?next=...`; otorisasi sebenarnya tetap divalidasi backend per request.
 - Login/logout/forgot/reset memakai Server Action di `lib/auth/actions.ts`.

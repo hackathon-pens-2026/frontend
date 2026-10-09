@@ -4,4 +4,6 @@ export interface AssistantMessage {
   text: string;
   timestamp: string;
   tone?: "info" | "success" | "error";
+  widget?: string | null;
+  status?: "sent" | "delivered" | "read";
 }

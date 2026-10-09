@@ -423,3 +423,74 @@ export interface ApiProblem {
   traceId?: string;
   errors?: Record<string, string[]>;
 }
+
+// ==========================================
+// Chat DTOs (/api/v1/chat)
+// ==========================================
+export interface CreateSessionRequest {
+  letterRequestId?: string | null;
+  typeId?: string | null;
+}
+
+export interface SendChatMessageRequest {
+  text?: string | null;
+  directFieldUpdates?: Record<string, string> | null;
+}
+
+export interface ChatMessageDto {
+  id: number;
+  from: string;
+  text: string;
+  widget?: string | null;
+  createdAt: string;
+}
+
+export interface FieldSummaryDto {
+  totalRequired: number;
+  filledRequired: number;
+  missingRequiredKeys: string[];
+}
+
+export interface CandidatePersonDto {
+  userId: string;
+  name: string;
+  positionCode: string;
+  positionName: string;
+  meta?: string | null;
+}
+
+export interface RoomOptionDto {
+  id: string;
+  code: string;
+  floor?: number | null;
+  facilityId: string;
+  facilityName: string;
+}
+
+export interface ChatTurnResponseDto {
+  sessionId: string;
+  letterRequestId?: string | null;
+  typeId?: string | null;
+  reply: ChatMessageDto;
+  fields: Record<string, string>;
+  fieldSummary: FieldSummaryDto;
+  suggestedWidget?: string | null;
+  candidates?: CandidatePersonDto[] | null;
+  availability?: AvailabilityDto | null;
+  draft?: DraftDto | null;
+  status: string;
+  fallbackAvailable: boolean;
+}
+
+export interface ChatSessionDetailDto {
+  sessionId: string;
+  letterRequestId?: string | null;
+  typeId?: string | null;
+  status: string;
+  messages: ChatMessageDto[];
+  fields: Record<string, string>;
+  fieldSummary: FieldSummaryDto;
+  suggestedWidget?: string | null;
+  draft?: DraftDto | null;
+}
+

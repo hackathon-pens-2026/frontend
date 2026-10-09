@@ -15,6 +15,7 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/lib/auth/session-provider";
 import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
+import { UserSwitcher } from "./user-switcher";
 
 interface StudentSidebarProps {
   currentPath?: string;
@@ -79,35 +80,8 @@ export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: Stu
         </Link>
       </div>
 
-      {/* User Identity Card */}
-      <div className="mb-5 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <span className="flex size-9 items-center justify-center rounded-full bg-navy text-micro font-bold text-white ring-1 ring-white/20">
-              {initialsOf(displayName)}
-            </span>
-            <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-midnight bg-emerald-500" />
-          </div>
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-body font-semibold text-white">
-              {displayName}
-            </div>
-            <div className="truncate font-mono text-[11px] text-slate-400">
-              {identityNumber}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2">
-          <span className="max-w-[120px] truncate text-[11px] text-slate-400">
-            {primaryPosition}
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-            <ShieldCheckIcon className="size-3 text-emerald-400" />
-            <span>Sesi Aktif</span>
-          </span>
-        </div>
-      </div>
+      {/* User Switcher Dropdown */}
+      <UserSwitcher />
 
       {/* QR Tanda Tangan */}
       <button

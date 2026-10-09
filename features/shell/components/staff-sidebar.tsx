@@ -11,6 +11,7 @@ import {
   MailIcon,
   SignItIcon,
 } from "@/components/ui";
+import { UserSwitcher } from "./user-switcher";
 
 interface StaffSidebarProps {
   view: NavView;
@@ -57,6 +58,9 @@ export function StaffSidebar({
           </div>
         </div>
       </div>
+
+      {/* User Switcher Dropdown */}
+      <UserSwitcher />
 
       {/* Nav Menu */}
       <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">

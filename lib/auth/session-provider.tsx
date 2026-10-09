@@ -1,15 +1,14 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, UNAUTHORIZED_EVENT } from "@/lib/api/client";
-import { ApiError } from "@/lib/api/errors";
 import { logoutAction } from "@/lib/auth/actions";
-import { isPublicPath } from "@/lib/auth/constants";
-import { postLoginPath, routeRedirect } from "./routing";
+import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";
+
 export interface SessionValue {
   status: SessionStatus;
   user: UserDto | null;
@@ -20,80 +19,122 @@ export interface SessionValue {
   hasCapability: (capability: UserCapability) => boolean;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
+  personas: DemoPersona[];
+  currentPersonaId: string;
+  switchUser: (personaId: string) => void;
 }
-type SessionState = { pathname: string; status: SessionStatus; user: UserDto | null; message?: string };
+
 const SessionContext = createContext<SessionValue | null>(null);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const sequence = useRef(0);
-  const [session, setSession] = useState<SessionState>({ pathname: "", status: "loading", user: null });
 
-  const checkSession = useCallback(async (signal?: AbortSignal) => {
-    if (signal?.aborted) return;
-    const request = ++sequence.current;
+  const [currentPersonaId, setCurrentPersonaId] = useState<string>("pengaju");
+  const [user, setUser] = useState<UserDto>(() => personaToUserDto(DEMO_PERSONAS[0]));
+  const [status, setStatus] = useState<SessionStatus>("authenticated");
+
+  // Load persisted demo persona from localStorage on mount
+  useEffect(() => {
     try {
-      const user = await apiFetch<UserDto>("/me", { skipUnauthorizedEvent: true, signal });
-      if (request === sequence.current && !signal?.aborted) setSession({ pathname, user, status: "authenticated" });
-    } catch (cause) {
-      if (request !== sequence.current || signal?.aborted) return;
-      setSession({ pathname, user: null,
-        status: cause instanceof ApiError && cause.status === 401 ? "unauthenticated" : "error",
-        message: cause instanceof Error ? cause.message : "Sesi tidak dapat diperiksa. Coba kembali.",
-      });
+      const saved = localStorage.getItem("signit_active_persona");
+      if (saved) {
+        const found = DEMO_PERSONAS.find((p) => p.id === saved);
+        if (found) {
+          setCurrentPersonaId(found.id);
+          setUser(personaToUserDto(found));
+        }
+      }
+    } catch {
+      // Ignore localStorage errors
     }
-  }, [pathname]);
+  }, []);
 
+  // Try optional background sync with backend /me if real session exists
   useEffect(() => {
-    const controller = new AbortController();
-    queueMicrotask(() => void checkSession(controller.signal));
-    return () => controller.abort();
-  }, [checkSession]);
+    let active = true;
+    apiFetch<UserDto>("/me", { skipUnauthorizedEvent: true })
+      .then((realUser) => {
+        if (!active) return;
+        // If a real backend session exists, merge or use it
+        if (realUser?.name) {
+          setUser(realUser);
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully to demo persona without kicking user out
+      });
 
-  useEffect(() => {
-    const handler = () => {
-      sequence.current++;
-      setSession({ pathname, user: null, status: "unauthenticated" });
+    return () => {
+      active = false;
     };
-    window.addEventListener(UNAUTHORIZED_EVENT, handler);
-    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handler);
-  }, [pathname]);
+  }, []);
 
-  // A previous page's 401 must never redirect a freshly completed login.
-  const status = session.pathname === pathname ? session.status : "loading";
-  const user = status === "authenticated" ? session.user : null;
-  const destination = user
-    ? pathname === "/login" ? postLoginPath(user, searchParams.get("next")) : routeRedirect(user, pathname)
-    : status === "unauthenticated" && !isPublicPath(pathname)
-      ? `/login?next=${encodeURIComponent(`${pathname}${searchParams.size ? `?${searchParams}` : ""}`)}` : null;
-
+  // Redirect away from /login if user is already in demo mode
   useEffect(() => {
-    if (destination) router.replace(destination);
-  }, [destination, router]);
+    if (pathname === "/login") {
+      router.replace("/");
+    }
+  }, [pathname, router]);
 
-  const refresh = useCallback(async () => { await checkSession(); }, [checkSession]);
+  // Switch user callback
+  const switchUser = useCallback((personaId: string) => {
+    const target = DEMO_PERSONAS.find((p) => p.id === personaId);
+    if (!target) return;
+
+    setCurrentPersonaId(target.id);
+    const dto = personaToUserDto(target);
+    setUser(dto);
+    setStatus("authenticated");
+
+    try {
+      localStorage.setItem("signit_active_persona", target.id);
+    } catch {
+      // Ignore
+    }
+
+    // Auto-navigate between student & management portals if appropriate
+    if (target.uiSurface === "Management" && pathname === "/") {
+      router.push("/manajemen");
+    } else if (target.uiSurface === "Student" && pathname === "/manajemen") {
+      router.push("/");
+    }
+  }, [pathname, router]);
+
+  const refresh = useCallback(async () => {
+    // Keep user authenticated
+    setStatus("authenticated");
+  }, []);
+
   const logout = useCallback(async () => {
-    sequence.current++;
-    setSession({ pathname, status: "loading", user: null });
-    await logoutAction();
-  }, [pathname]);
-  const value = useMemo<SessionValue>(() => ({
-    status, user, userCategory: user?.userCategory ?? null, uiSurface: user?.uiSurface ?? null,
-    capabilities: user?.capabilities ?? [], assignments: user?.assignments ?? [],
-    hasCapability: (capability) => (user?.capabilities ?? []).includes(capability), refresh, logout,
-  }), [status, user, refresh, logout]);
+    // Switch back to default student persona instead of forcing login screen
+    switchUser("pengaju");
+    try {
+      await logoutAction();
+    } catch {
+      // Ignore
+    }
+  }, [switchUser]);
 
-  const content = isPublicPath(pathname) || (status === "authenticated" && !destination) ? children
-    : <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <div className="max-w-md space-y-4 rounded-xl border border-line bg-surface p-6" role="status">
-          <p>{status === "error" ? session.message : "Memeriksa sesi…"}</p>
-          {status === "error" && <button type="button" onClick={() => void refresh()}
-            className="rounded-lg bg-primary px-4 py-2 text-surface">Coba lagi</button>}
-        </div>
-      </main>;
-  return <SessionContext.Provider value={value}>{content}</SessionContext.Provider>;
+  const value = useMemo<SessionValue>(
+    () => ({
+      status,
+      user,
+      userCategory: user.userCategory,
+      uiSurface: user.uiSurface,
+      capabilities: user.capabilities,
+      assignments: user.assignments,
+      hasCapability: (capability) => user.capabilities.includes(capability),
+      refresh,
+      logout,
+      personas: DEMO_PERSONAS,
+      currentPersonaId,
+      switchUser,
+    }),
+    [status, user, refresh, logout, currentPersonaId, switchUser],
+  );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 export function useSession(): SessionValue {

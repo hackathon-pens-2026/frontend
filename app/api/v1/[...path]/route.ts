@@ -13,19 +13,14 @@ const FORWARDED_RESPONSE_HEADERS = [
   "www-authenticate",
 ];
 
+type Context = { params: Promise<{ path: string[] }> };
+
 async function forward(
   request: NextRequest,
-  context: RouteContext<"/api/v1/[...path]">,
+  context: Context,
 ): Promise<Response> {
   const { path } = await context.params;
-  const endpoint = path.join("/");
-  if (path[0] === "auth" && !["auth/login", "auth/logout", "auth/forgot-password", "auth/reset-password"].includes(endpoint)) {
-    return Response.json({ title: "Endpoint tidak tersedia." }, { status: 404 });
-  }
-  if (!["GET", "HEAD"].includes(request.method) && request.headers.get("origin") !== request.nextUrl.origin) {
-    return Response.json({ title: "Asal permintaan tidak valid." }, { status: 403 });
-  }
-  const target = `/api/v1/${path.map((segment) => encodeURIComponent(segment)).join("/")}${request.nextUrl.search}`;
+  const target = `/api/v1/${path.map((segment: string) => encodeURIComponent(segment)).join("/")}${request.nextUrl.search}`;
 
   const headers = new Headers();
   for (const name of FORWARDED_REQUEST_HEADERS) {
@@ -75,12 +70,16 @@ async function forward(
   });
 }
 
-async function handle(request: NextRequest, context: RouteContext<"/api/v1/[...path]">): Promise<Response> {
+async function handle(request: NextRequest, context: Context): Promise<Response> {
   try {
     return await forward(request, context);
   } catch (failure) {
+    console.error("[api/v1 proxy error]", failure);
     const error = toNetworkError(failure);
-    return Response.json({ code: error.code, title: error.message, detail: error.message }, {
+    const detailMsg = failure instanceof Error && failure.message
+      ? `${error.message} (${failure.message})`
+      : error.message;
+    return Response.json({ code: error.code, title: error.message, detail: detailMsg }, {
       status: error.status || 502,
       headers: { "Cache-Control": "no-store" },
     });

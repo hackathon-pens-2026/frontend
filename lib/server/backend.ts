@@ -1,17 +1,18 @@
 import { ApiError, toApiError } from "@/lib/api/errors";
 
 export function backendBaseUrl(): string {
-  const configured = process.env.BACKEND_URL?.trim();
+  const configured = (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL)?.trim();
   if (!configured) {
     throw new ApiError(503, "backend_configuration_missing", "BACKEND_URL belum dikonfigurasi pada frontend.", null);
   }
   try {
     const base = new URL(configured);
-    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password
-      || base.pathname !== "/" || base.search || base.hash) throw new Error("invalid_origin");
+    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
+      throw new Error("invalid_origin");
+    }
     return base.origin;
   } catch {
-    throw new ApiError(503, "backend_configuration_invalid", "BACKEND_URL harus berupa URL HTTP/HTTPS lengkap tanpa /api/v1.", null);
+    throw new ApiError(503, "backend_configuration_invalid", "BACKEND_URL harus berupa URL HTTP/HTTPS lengkap (contoh: http://signit.indonesiacentral.cloudapp.azure.com:8080).", null);
   }
 }
 

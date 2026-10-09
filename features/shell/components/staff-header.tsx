@@ -97,11 +97,11 @@ export function StaffHeader({
               {/* Quick portal switcher */}
               <div className="border-b border-line py-1">
                 <Link
-                  href="/"
+                  href="/surat"
                   className="flex h-10 w-full items-center gap-2.5 rounded-lg px-3 text-body text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   <ExternalDutyIcon className="size-4 text-navy" />
-                  <span className="font-medium">Beralih ke Portal Mahasiswa</span>
+                  <span className="font-medium">Lihat Pengajuan Saya</span>
                 </Link>
               </div>
 

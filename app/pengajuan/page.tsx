@@ -1,8 +1,5 @@
-"use client";
-
-import { SessionGate } from "@/features/auth/session-gate";
-import { LetterForm } from "@/features/letters/letter-form";
+import { redirect } from "next/navigation";
 
 export default function PengajuanPage() {
-  return <SessionGate>{() => <LetterForm />}</SessionGate>;
+  redirect("/surat/baru");
 }

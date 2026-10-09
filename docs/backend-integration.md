@@ -1,13 +1,25 @@
-# Integrasi backend
+# Integrasi dan routing
 
-Frontend menggunakan `/api/backend/*` sebagai boundary same-origin. `BACKEND_URL` hanya dibaca server Next.js: lokal `http://localhost:8080`, Compose `http://backend:8080`. Salin `.env.example` menjadi `.env.local` untuk pengembangan lokal, lalu restart frontend.
+Frontend memakai BFF same-origin `/api/v1/*`; `/api/backend/*` merupakan alias kompatibilitas dengan cookie dan refresh yang sama. `BACKEND_URL` hanya dibaca server Next.js. Konfigurasi proyek ini menunjuk backend Azure; tidak ada fallback otomatis ke localhost. Browser tetap memanggil origin frontend, lalu Next.js meneruskan permintaan ke Azure.
 
-`/pengajuan` menyediakan login akun provisioned, katalog schema empat template, organisasi yang diizinkan, kandidat Ketua Pelaksana/Ketua Organisasi, fasilitas/ruangan, simpan/edit draft, routing preview, Generate, polling dan download preview, lalu submit terpisah. Versi/revisi/hash serta slot PDF berasal dari backend. Idempotency-Key submit dipertahankan saat retry pada halaman yang sama.
+Login memakai akun provisioned. Cookie `signit_at` dan `signit_rt` bersifat HttpOnly, SameSite=Lax, Secure pada production. Token tidak diberikan sebagai JSON ke browser dan tidak disimpan di localStorage. Mutasi BFF memeriksa Origin. Refresh single-flight dipisahkan berdasarkan hash token sesi; tiap response menulis cookie hasil rotasi sendiri. Koordinasi ini berlaku dalam satu proses Next.js; deployment multi-instance membutuhkan koordinasi bersama sebelum mengklaim refresh serentak lintas instance aman.
 
-Token akses disimpan sebagai cookie HttpOnly SameSite=Lax; mutasi memeriksa Origin. Token/refresh token tidak dikirim sebagai JSON ke browser dan tidak disimpan di localStorage. Cookie Secure digunakan untuk akses HTTPS. Sesi kedaluwarsa memerlukan login ulang pada BFF `/api/backend` ini; refresh otomatis tersedia pada BFF utama `/api/v1`. Gunakan HTTPS untuk deployment publik.
+| Route | Tujuan |
+|---|---|
+| `/login` | Login; `next` internal diperiksa sebelum navigasi |
+| `/` | Dashboard mahasiswa/Dagri; manajemen dialihkan ke `/manajemen` |
+| `/manajemen` | BAAK/manajemen; mahasiswa dialihkan ke dashboard sendiri |
+| `/persetujuan` | Inbox mahasiswa dengan capability Signer/Approver, termasuk Dagri |
+| `/staff` | Alias lama: menuju `/manajemen` atau `/persetujuan` sesuai sesi |
+| `/surat`, `/surat/[id]` | Daftar/detail berizin; backend memeriksa akses per objek |
+| `/surat/baru` | Asisten/form dari schema backend; Generate dan Ajukan terpisah |
+| `/pengajuan` | Alias ke `/surat/baru`, tanpa formulir login kedua |
+| `/forgot-password`, `/reset-password` | Pemulihan akun |
 
-Backend yang gagal startup JWT tidak dapat melayani integrasi ini. Katalog template membutuhkan aset template tersedia pada backend. Jangan menampilkan data contoh sebagai hasil API.
+SessionProvider mengecek ulang `/me` saat pathname berubah, mengabaikan hasil dari halaman lama, dan menahan halaman privat sampai sesi diperiksa. Hanya 401 berarti perlu login; kegagalan jaringan/server menampilkan Coba lagi. Guard navigasi UI bukan pengganti otorisasi backend. Kategori tidak memberikan hak bertindak pada tugas orang lain.
 
-Alur `/pengajuan` ini tetap tersedia sebagai katalog/ajuan ringkas. Area utama aplikasi (`/`, `/surat`, `/surat/[id]`, `/staff`, `/manajemen`) memakai BFF `/api/v1` (cookie HttpOnly access+refresh dengan single-flight refresh) dan mencakup dashboard, daftar/detail surat, inbox tugas, serta unduhan dokumen; integrasi chatbot/LLM di frontend belum dihubungkan.
+Routing persetujuan tetap dihitung backend: Proposal/LPJ lima tahap; barang enam tahap; Pasca/SAW enam tahap tanpa Dagri; D3/D4/lapangan tujuh tahap dengan Dagri. Himpunan memakai Kemahasiswaan, Organisasi memakai Tim Pembina Minat dan Bakat. Semua pejabat approver diblokir dari self-approval. Peserta Ketua Pelaksana/Ketua Organisasi dipilih dari akun eligible, tidak otomatis sama dengan pengaju.
 
-Draft disimpan di backend setelah Generate ditekan. ID draft ditampilkan; pemulihan draft setelah reload belum tersedia melalui UI. Input yang belum disimpan akan hilang ketika halaman ditutup. Jadwal/bentrok reservasi mengikuti implementasi backend yang terpisah, bukan disimpulkan oleh frontend.
+Assignment UAT mulai 10 Oktober 2026 pukul 00.00 WIB. Seed awal keliru memakai 00.00 UTC (07.00 WIB); koreksi ter-audit tersedia dalam `backend/provisioning/uat-assignment-start.sql`. Backend server harus diperbarui dan seed yang direvisi dijalankan sebelum menguji perubahan backend/master data di Azure. Password lama tidak direset.
+
+Gunakan HTTPS untuk deployment publik. Alamat `.example` tidak menerima email; tes notifikasi memerlukan sandbox/alamat terkontrol. Jangan menganggap build atau tes routing sebagai bukti seluruh fitur PRD (misalnya OCR dan reservasi barang) sudah selesai.

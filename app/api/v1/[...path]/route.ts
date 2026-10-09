@@ -20,6 +20,7 @@ async function forward(
   context: Context,
 ): Promise<Response> {
   const { path } = await context.params;
+  const endpoint = path.join("/");
   const target = `/api/v1/${path.map((segment: string) => encodeURIComponent(segment)).join("/")}${request.nextUrl.search}`;
 
   const headers = new Headers();

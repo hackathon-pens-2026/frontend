@@ -9,6 +9,7 @@ import {
   MailIcon,
   PenToolIcon,
   ShieldCheckIcon,
+  SignItIcon,
   SparklesIcon,
 } from "@/components/ui";
 
@@ -45,10 +46,7 @@ export function StudentSidebar({ currentPath = "/surat/baru" }: StudentSidebarPr
       {/* Brand Header */}
       <div className="flex items-center gap-3 px-2 pb-5">
         <Link href="/" className="group flex items-center gap-3">
-          <div className="relative flex size-10 items-center justify-center rounded-xl bg-navy shadow-lift">
-            <PenToolIcon className="size-5 text-white" strokeWidth={2.4} />
-            <span className="absolute -right-0.5 -bottom-0.5 size-3 rounded-full border-2 border-midnight bg-gold" />
-          </div>
+          <SignItIcon className="size-10 rounded-xl shadow-lift" />
           <div className="leading-tight">
             <div className="text-[18px] font-extrabold tracking-tight text-white group-hover:text-gold transition-colors">
               SignIt<span className="text-gold">!</span>

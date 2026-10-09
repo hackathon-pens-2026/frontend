@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 240" width="100%" height="100%">
+  <defs>
+    <!-- Metallic Gold Gradient -->
+    <linearGradient id="goldGradH" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="35%" stop-color="#EAB308"/>
+      <stop offset="70%" stop-color="#CA8A04"/>
+      <stop offset="100%" stop-color="#A16207"/>
+    </linearGradient>
+
+    <!-- Electric Cyan Gradient -->
+    <linearGradient id="cyanGradH" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="60%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#1D4ED8"/>
+    </linearGradient>
+
+    <!-- Dark Lacquer Pen Body Gradient -->
+    <linearGradient id="bodyGradH" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="45%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+
+    <!-- Filter Glow -->
+    <filter id="glowH" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Left Icon Mark Container -->
+  <g transform="translate(10, 0)">
+    <!-- Signature S Curve Loop -->
+    <path d="M 50 185 C 80 220, 145 220, 165 180 C 185 140, 130 115, 115 95 C 95 70, 105 45, 135 40 C 160 35, 185 55, 220 20" 
+          fill="none" 
+          stroke="url(#goldGradH)" 
+          stroke-width="9" 
+          stroke-linecap="round"/>
+
+    <!-- Verification Checkmark -->
+    <path d="M 140 175 L 165 200 L 225 125" 
+          fill="none" 
+          stroke="url(#cyanGradH)" 
+          stroke-width="10" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          filter="url(#glowH)"/>
+
+    <!-- Fountain Pen Nib -->
+    <g transform="translate(100, 22) rotate(-18) scale(0.68)">
+      <!-- Barrel & Rings -->
+      <rect x="-24" y="0" width="48" height="24" rx="4" fill="url(#bodyGradH)" stroke="url(#goldGradH)" stroke-width="2.5"/>
+      <rect x="-26" y="22" width="52" height="10" rx="3" fill="url(#goldGradH)"/>
+      <rect x="-22" y="32" width="44" height="20" rx="2" fill="url(#bodyGradH)"/>
+      <rect x="-25" y="50" width="50" height="7" rx="2" fill="url(#goldGradH)"/>
+
+      <!-- Nib Body -->
+      <path d="M -22 57 
+               C -22 80, -32 105, -30 135 
+               C -28 155, -4 185, 0 192 
+               C 4 185, 28 155, 30 135 
+               C 32 105, 22 80, 22 57 
+               Z" 
+            fill="url(#bodyGradH)" 
+            stroke="url(#goldGradH)" 
+            stroke-width="3"/>
+
+      <!-- Inner gold wings -->
+      <path d="M -16 65 
+               C -16 85, -24 105, -22 130 
+               C -20 146, -3 172, 0 178 
+               C 3 172, 20 146, 22 130 
+               C 24 105, 16 85, 16 65 
+               Z" 
+            fill="none" 
+            stroke="url(#goldGradH)" 
+            stroke-width="2.5"/>
+
+      <!-- Slit and Breather -->
+      <line x1="0" y1="95" x2="0" y2="192" stroke="url(#goldGradH)" stroke-width="2.5"/>
+      <circle cx="0" cy="95" r="5" fill="url(#goldGradH)"/>
+      <circle cx="0" cy="95" r="2.5" fill="#0F172A"/>
+
+      <!-- Pen tip pulse -->
+      <circle cx="0" cy="192" r="4.5" fill="#38BDF8" filter="url(#glowH)"/>
+    </g>
+  </g>
+
+  <!-- Typography / Wordmark -->
+  <g transform="translate(260, 145)">
+    <!-- 'Sign' text -->
+    <text font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif" 
+          font-weight="800" 
+          font-size="86" 
+          letter-spacing="-1"
+          fill="#0F172A">
+      Sign<tspan fill="url(#cyanGradH)">It</tspan><tspan fill="url(#goldGradH)">!</tspan>
+    </text>
+
+    <!-- Tagline -->
+    <text x="5" y="44" 
+          font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Inter, sans-serif" 
+          font-weight="600" 
+          font-size="19" 
+          letter-spacing="5" 
+          fill="#64748B">
+      DIGITAL CAMPUS APPROVAL
+    </text>
+  </g>
+
+  <!-- Verified Security Badge Pill -->
+  <g transform="translate(735, 68)">
+    <rect width="125" height="30" rx="15" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+    <circle cx="16" cy="15" r="5" fill="#10B981"/>
+    <text x="30" y="20" 
+          font-family="system-ui, sans-serif" 
+          font-size="11" 
+          font-weight="700" 
+          letter-spacing="1" 
+          fill="#334155">VERIFIED</text>
+  </g>
+</svg>

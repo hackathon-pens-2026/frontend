@@ -6,3 +6,4 @@ export * from "./avatar";
 export * from "./timeline";
 export * from "./qr-pattern";
 export * from "./icons";
+export * from "./signit-logo";

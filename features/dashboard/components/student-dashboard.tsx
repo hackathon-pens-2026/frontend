@@ -261,9 +261,7 @@ export default function StudentDashboard() {
         className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-[#0f172a] px-4 py-5 select-none text-white shadow-lg"
       >
         <div className="flex items-center gap-3 px-2">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-[#1e3a8a] text-white shadow-xs ring-1 ring-white/10">
-            <LogoIcon size={20} />
-          </div>
+          <LogoIcon size={40} className="size-10 rounded-xl shadow-lift" />
           <div className="leading-tight">
             <div className="text-[17px] font-bold tracking-tight text-white">
               SignIt<span className="text-amber-400 font-extrabold">!</span>

@@ -5,6 +5,8 @@ import { FilterStatus, Letter, NavigationItem, UserProfile } from "../types";
 import { SummaryCards } from "./summary-cards";
 import { AttentionSection } from "./attention-section";
 import { RecentLetters } from "./recent-letters";
+import { PermitWizard } from "@/features/permit-wizard/components/permit-wizard";
+import { TrackingDetail } from "@/features/tracking-detail/components/tracking-detail";
 import {
   LogoIcon,
   SearchIcon,
@@ -12,16 +14,12 @@ import {
   LayoutDashboardIcon,
   FilePlusIcon,
   FileTextIcon,
-  ArchiveIcon,
-  FolderStackIcon,
-  SettingsIcon,
   QrCodeIcon,
   ShieldCheckIcon,
   DownloadIcon,
   XIcon,
   CheckIcon,
   UploadIcon,
-  EyeIcon,
 } from "./icons";
 
 const mockProfile: UserProfile = {
@@ -143,9 +141,6 @@ const navigationMenu: NavigationItem[] = [
   { id: "dashboard", label: "Dashboard" },
   { id: "new-request", label: "Buat Pengajuan Baru" },
   { id: "my-letters", label: "Surat Saya", badge: 3 },
-  { id: "archive", label: "Arsip Selesai" },
-  { id: "templates", label: "Template Surat" },
-  { id: "settings", label: "Pengaturan" },
 ];
 
 export default function StudentDashboard() {
@@ -198,14 +193,8 @@ export default function StudentDashboard() {
       case "new-request":
         return <FilePlusIcon size={18} />;
       case "my-letters":
-        return <FileTextIcon size={18} />;
-      case "archive":
-        return <ArchiveIcon size={18} />;
-      case "templates":
-        return <FolderStackIcon size={18} />;
-      case "settings":
       default:
-        return <SettingsIcon size={18} />;
+        return <FileTextIcon size={18} />;
     }
   };
 
@@ -273,21 +262,18 @@ export default function StudentDashboard() {
         </div>
         <nav className="flex flex-col gap-1" aria-label="Menu Utama">
           {navigationMenu.map((item) => {
-            const isActive = activeNav === item.id;
+            const isActive =
+              activeNav === item.id ||
+              (item.id === "my-letters" && activeNav === "tracking");
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => {
-                  setActiveNav(item.id);
-                  if (item.id === "new-request") {
-                    setShowNewLetterModal(true);
-                  } else if (item.id === "my-letters") {
-                    setFilter("Semua");
-                  } else if (item.id === "archive") {
-                    setFilter("Disetujui");
-                  } else if (item.id !== "dashboard") {
-                    showNotification(`Layanan ${item.label} aktif.`);
+                  if (item.id === "my-letters") {
+                    setActiveNav("tracking");
+                  } else {
+                    setActiveNav(item.id);
                   }
                 }}
                 className={`relative flex h-10 items-center gap-3 rounded-lg px-3 text-xs font-medium transition-colors cursor-pointer text-left ${
@@ -362,7 +348,7 @@ export default function StudentDashboard() {
           <div className="ml-auto flex items-center gap-4">
             <button
               type="button"
-              onClick={() => setShowNewLetterModal(true)}
+              onClick={() => setActiveNav("new-request")}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e3a8a] px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-[#172554] cursor-pointer"
             >
               <PlusIcon size={16} />
@@ -410,63 +396,83 @@ export default function StudentDashboard() {
         </header>
 
         {/* Content Body */}
-        <main className="mx-auto w-full max-w-[1240px] space-y-6 px-8 py-6 flex-1 bg-[#f8fafc]">
-          {/* Welcome Header */}
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                Selamat Datang, Fajrul
-              </h1>
-              <p className="mt-1 text-xs text-slate-500">
-                Pantau kelancaran birokrasi dan status surat izin secara terpusat.
-              </p>
+        {activeNav === "new-request" ? (
+          <PermitWizard onBackToDashboard={() => setActiveNav("dashboard")} />
+        ) : activeNav === "tracking" || activeNav === "my-letters" ? (
+          <TrackingDetail
+            onBackToDashboard={() => setActiveNav("dashboard")}
+            onBackToLetters={() => setActiveNav("dashboard")}
+            onShowNotification={showNotification}
+          />
+        ) : (
+          <main className="mx-auto w-full max-w-[1240px] space-y-6 px-8 py-6 flex-1 bg-[#f8fafc]">
+            {/* Welcome Header */}
+            <div className="flex items-end justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Selamat Datang, Fajrul
+                </h1>
+                <p className="mt-1 text-xs text-slate-500">
+                  Pantau kelancaran birokrasi dan status surat izin secara terpusat.
+                </p>
+              </div>
+
+              {/* Sync Badge */}
+              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-xs">
+                <span className="relative flex size-2">
+                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500 opacity-60" />
+                  <span className="relative size-2 rounded-full bg-emerald-500" />
+                </span>
+                <span>Tersinkron · baru saja</span>
+              </div>
             </div>
 
-            {/* Sync Badge */}
-            <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-xs">
-              <span className="relative flex size-2">
-                <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500 opacity-60" />
-                <span className="relative size-2 rounded-full bg-emerald-500" />
-              </span>
-              <span>Tersinkron · baru saja</span>
-            </div>
-          </div>
+            {/* Component: Summary Cards */}
+            <SummaryCards
+              onSelectMetric={(id) => {
+                if (id === "active") setFilter("Berjalan");
+                else if (id === "approved") setFilter("Disetujui");
+                else if (id === "waiting") setFilter("Berjalan");
+              }}
+            />
 
-          {/* Component: Summary Cards */}
-          <SummaryCards
-            onSelectMetric={(id) => {
-              if (id === "active") setFilter("Berjalan");
-              else if (id === "approved") setFilter("Disetujui");
-              else if (id === "waiting") setFilter("Berjalan");
-            }}
-          />
+            {/* Component: Attention Section */}
+            <AttentionSection
+              onOpenTracking={(no) => {
+                if (no === "042/KM/PENS/X/2026") {
+                  setActiveNav("tracking");
+                } else {
+                  const item = mockLetters.find((l) => l.no === no);
+                  if (item) setSelectedLetter(item);
+                }
+              }}
+              onSendNudge={() => {
+                setIsNudgeSent(true);
+                showNotification("Nudge pengingat resmi dikirim ke approver BEM PENS via email.");
+              }}
+              onViewNotes={() => setShowRevisionModal(true)}
+              onUploadRevision={() => setShowUploadModal(true)}
+              isNudgeSent={isNudgeSent}
+            />
 
-          {/* Component: Attention Section */}
-          <AttentionSection
-            onOpenTracking={(no) => {
-              const item = mockLetters.find((l) => l.no === no);
-              if (item) setSelectedLetter(item);
-            }}
-            onSendNudge={() => {
-              setIsNudgeSent(true);
-              showNotification("Nudge pengingat resmi dikirim ke approver BEM PENS via email.");
-            }}
-            onViewNotes={() => setShowRevisionModal(true)}
-            onUploadRevision={() => setShowUploadModal(true)}
-            isNudgeSent={isNudgeSent}
-          />
-
-          {/* Component: Recent Letters Table */}
-          <RecentLetters
-            letters={filteredLetters}
-            currentFilter={filter}
-            onFilterChange={setFilter}
-            onSelectLetter={(letter) => setSelectedLetter(letter)}
-            onDownloadPdf={(letter) =>
-              showNotification(`Mengunduh berkas resmi ber-QR: ${letter.no}.pdf`)
-            }
-          />
-        </main>
+            {/* Component: Recent Letters Table */}
+            <RecentLetters
+              letters={filteredLetters}
+              currentFilter={filter}
+              onFilterChange={setFilter}
+              onSelectLetter={(letter) => {
+                if (letter.no === "042/KM/PENS/X/2026") {
+                  setActiveNav("tracking");
+                } else {
+                  setSelectedLetter(letter);
+                }
+              }}
+              onDownloadPdf={(letter) =>
+                showNotification(`Mengunduh berkas resmi ber-QR: ${letter.no}.pdf`)
+              }
+            />
+          </main>
+        )}
       </div>
 
       {/* Slide-over Drawer for Tracking Detail */}
@@ -582,7 +588,18 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            <div className="border-t border-slate-200 bg-[#f8fafc] p-4">
+            <div className="border-t border-slate-200 bg-[#f8fafc] p-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedLetter(null);
+                  setActiveNav("tracking");
+                }}
+                className="w-full flex h-10 items-center justify-center gap-2 rounded-lg border border-[#1e3a8a] bg-blue-50/60 text-xs font-semibold text-[#1e3a8a] hover:bg-blue-100/70 transition cursor-pointer"
+              >
+                <span>Buka Detail Pelacakan Penuh #{selectedLetter.no.split("/")[0]}</span>
+              </button>
+
               {selectedLetter.downloadable ? (
                 <button
                   type="button"
@@ -803,6 +820,7 @@ export default function StudentDashboard() {
                   type="button"
                   onClick={() => {
                     setShowNewLetterModal(false);
+                    setActiveNav("new-request");
                     showNotification(`Template "${tmpl.title}" dipilih. Silakan lengkapi formulir.`);
                   }}
                   className="p-4 rounded-xl border border-slate-200 bg-[#f8fafc] hover:border-[#1e3a8a] hover:bg-white text-left transition group cursor-pointer shadow-xs"

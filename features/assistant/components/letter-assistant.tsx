@@ -1,18 +1,27 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AssistantMessage } from "../types";
 import { StudentSidebar } from "@/features/shell";
 import { AssistantHeader } from "./assistant-header";
 import { DraftSummary, DraftStatus } from "./draft-summary";
 import {
+  ArrowDownIcon,
   Button,
+  CheckCheckIcon,
   CheckIcon,
+  ClockIcon,
   SendIcon,
+  SignItIcon,
   SparklesIcon,
 } from "@/components/ui";
 import { ApiError } from "@/lib/api/errors";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
+import {
+  createOrResumeSession,
+  sendChatMessage,
+} from "@/lib/api/chat";
 import {
   createDraft,
   editDraft,
@@ -47,6 +56,10 @@ const errorText = (cause: unknown, fallback: string) =>
   cause instanceof ApiError ? cause.message : fallback;
 
 export function LetterAssistant() {
+  const searchParams = useSearchParams();
+  const urlDraftId = searchParams.get("draftId");
+  const urlTypeId = searchParams.get("typeId");
+
   const [templates, setTemplates] = useState<LetterTemplateDto[]>([]);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [template, setTemplate] = useState<LetterTemplateDto | null>(null);
@@ -55,11 +68,17 @@ export function LetterAssistant() {
     {
       id: nextId(),
       from: "bot",
-      text: "Halo! Ingin membuat tipe surat apa? Pilih salah satu template resmi di bawah.",
+      text: "Halo! Ingin membuat tipe surat apa hari ini? Pilih salah satu template resmi di bawah atau ketik langsung kebutuhan Anda.",
       timestamp: timeNow(),
+      widget: "typePills",
     },
   ]);
   const [input, setInput] = useState("");
+  const [isBotThinking, setIsBotThinking] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean | null>(null);
+  const [suggestedWidget, setSuggestedWidget] = useState<string | null>(null);
+
   const [organizations, setOrganizations] = useState<RoutingOrganizationDto[]>([]);
   const [organizationsLoaded, setOrganizationsLoaded] = useState(false);
   const [organizationId, setOrganizationId] = useState("");
@@ -76,36 +95,134 @@ export function LetterAssistant() {
   const [preview, setPreview] = useState<LetterPreviewDto | null>(null);
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [submittedNumber, setSubmittedNumber] = useState<string | null>(null);
-  const cancelled = useRef(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
-  useEffect(() => {
-    cancelled.current = false;
-    void (async () => {
-      try {
-        const [catalog, orgs] = await Promise.all([listTemplates(), listOrganizations()]);
-        setTemplates(catalog);
-        setOrganizations(orgs);
-        setOrganizationsLoaded(true);
-      } catch (cause) {
-        setTemplatesError(
-          errorText(cause, "Katalog template tidak dapat dimuat dari server."),
-        );
-      }
-    })();
-    return () => {
-      cancelled.current = true;
-    };
-  }, []);
+  const cancelled = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const addMessage = useCallback(
-    (text: string, from: AssistantMessage["from"] = "bot", tone?: AssistantMessage["tone"]) => {
-      setMessages((prev) => [...prev, { id: nextId(), from, text, timestamp: timeNow(), tone }]);
+    (
+      text: string,
+      from: AssistantMessage["from"] = "bot",
+      tone?: AssistantMessage["tone"],
+      widget?: string | null,
+    ) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: nextId(),
+          from,
+          text,
+          timestamp: timeNow(),
+          tone,
+          widget,
+          status: from === "user" ? "delivered" : undefined,
+        },
+      ]);
     },
     [],
   );
 
+  // Auto-scroll on new message
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, isBotThinking]);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    setShowScrollBottom(distanceFromBottom > 120);
+  };
+
+  const scrollToBottom = () => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  // Initialize or resume chat session with backend
+  useEffect(() => {
+    cancelled.current = false;
+    void (async () => {
+      let catalog: LetterTemplateDto[] = [];
+      try {
+        const [loadedCatalog, orgs] = await Promise.all([
+          listTemplates(),
+          listOrganizations(),
+        ]);
+        if (cancelled.current) return;
+        catalog = loadedCatalog;
+        setTemplates(loadedCatalog);
+        setOrganizations(orgs);
+        setOrganizationsLoaded(true);
+      } catch (cause) {
+        if (!cancelled.current) {
+          setTemplatesError(
+            errorText(cause, "Katalog template tidak dapat dimuat dari server."),
+          );
+        }
+      }
+
+      // Initialize backend chat session
+      try {
+        const session = await createOrResumeSession({
+          letterRequestId: urlDraftId ?? undefined,
+          typeId: urlTypeId ?? undefined,
+        });
+        if (cancelled.current) return;
+
+        setSessionId(session.sessionId);
+        setIsBackendConnected(true);
+        setSuggestedWidget(session.suggestedWidget ?? null);
+
+        if (session.messages?.length) {
+          setMessages(
+            session.messages.map((m) => ({
+              id: m.id,
+              from: m.from === "user" ? "user" : "bot",
+              text: m.text,
+              timestamp: new Date(m.createdAt).toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              widget: m.widget,
+              status: m.from === "user" ? "delivered" : undefined,
+            })),
+          );
+        }
+
+        if (session.fields && Object.keys(session.fields).length > 0) {
+          setFields(session.fields);
+        }
+
+        if (session.draft) {
+          setDraft(session.draft);
+          const matched = catalog.find((t) => t.typeId === session.draft?.typeId);
+          if (matched) setTemplate(matched);
+          setDraftSavedAt(timeNow());
+        } else if (session.typeId) {
+          const matched = catalog.find((t) => t.typeId === session.typeId);
+          if (matched) setTemplate(matched);
+        }
+      } catch {
+        if (!cancelled.current) {
+          setIsBackendConnected(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled.current = true;
+    };
+  }, [urlDraftId, urlTypeId]);
+
   const selectTemplate = useCallback(
-    (next: LetterTemplateDto) => {
+    async (next: LetterTemplateDto) => {
       setTemplate(next);
       setFields({});
       setDraft(null);
@@ -114,9 +231,7 @@ export function LetterAssistant() {
       setSubmittedNumber(null);
       setStatus("idle");
       setDirty(false);
-      addMessage(
-        `${next.name} dipilih. Lengkapi ${next.fields.filter((f) => f.valueSource === "user").length} field skema di panel kanan, lalu simpan draf.`,
-      );
+
       if (next.typeId === "peminjaman-ruangan") {
         void listFacilities()
           .then(setFacilities)
@@ -127,8 +242,50 @@ export function LetterAssistant() {
         setResources([]);
         setResourceId("");
       }
+
+      if (sessionId && isBackendConnected) {
+        setIsBotThinking(true);
+        try {
+          const response = await sendChatMessage(sessionId, {
+            text: `Saya memilih template: ${next.name}`,
+            directFieldUpdates: { typeId: next.typeId },
+          });
+          setIsBotThinking(false);
+          if (response.reply?.text) {
+            addMessage(
+              response.reply.text,
+              "bot",
+              undefined,
+              response.reply.widget ?? undefined,
+            );
+          }
+          if (response.fields && Object.keys(response.fields).length > 0) {
+            setFields(response.fields);
+          }
+          if (response.draft) {
+            setDraft(response.draft);
+            setDraftSavedAt(timeNow());
+          }
+          if (response.suggestedWidget) {
+            setSuggestedWidget(response.suggestedWidget);
+          }
+        } catch {
+          setIsBotThinking(false);
+          addMessage(
+            `${next.name} dipilih. Lengkapi ${
+              next.fields.filter((f) => f.valueSource === "user").length
+            } field skema di panel kanan, lalu simpan draf.`,
+          );
+        }
+      } else {
+        addMessage(
+          `${next.name} dipilih. Lengkapi ${
+            next.fields.filter((f) => f.valueSource === "user").length
+          } field skema di panel kanan, lalu simpan draf.`,
+        );
+      }
     },
-    [addMessage],
+    [sessionId, isBackendConnected, addMessage],
   );
 
   const loadCandidates = useCallback(
@@ -142,13 +299,29 @@ export function LetterAssistant() {
         setCandidates(result);
         const committee = result.find((c) => c.positionCode === "Ketupel");
         const chair = result.find((c) => c.positionCode === "KetuaOrganisasi");
-        setCommitteeChairId(committee?.userId ?? result[0]?.userId ?? "");
-        setOrganizationChairId(chair?.userId ?? result[0]?.userId ?? "");
+        const selectedComm = committee?.userId ?? result[0]?.userId ?? "";
+        const selectedChair = chair?.userId ?? result[0]?.userId ?? "";
+        setCommitteeChairId(selectedComm);
+        setOrganizationChairId(selectedChair);
+
+        if (sessionId && isBackendConnected && result.length > 0) {
+          void sendChatMessage(sessionId, {
+            directFieldUpdates: {
+              organizationId: orgId,
+              committeeChairId: selectedComm,
+              organizationChairId: selectedChair,
+            },
+          });
+        }
       } catch (cause) {
-        addMessage(errorText(cause, "Kandidat penanda tangan tidak dapat dimuat."), "bot", "error");
+        addMessage(
+          errorText(cause, "Kandidat penanda tangan tidak dapat dimuat."),
+          "bot",
+          "error",
+        );
       }
     },
-    [addMessage],
+    [sessionId, isBackendConnected, addMessage],
   );
 
   const selectFacility = useCallback(
@@ -158,9 +331,14 @@ export function LetterAssistant() {
       setResources([]);
       if (!nextFacilityId) return;
       try {
-        setResources(await listResources(nextFacilityId));
+        const list = await listResources(nextFacilityId);
+        setResources(list);
       } catch (cause) {
-        addMessage(errorText(cause, "Daftar ruangan tidak dapat dimuat."), "bot", "error");
+        addMessage(
+          errorText(cause, "Daftar ruangan tidak dapat dimuat."),
+          "bot",
+          "error",
+        );
       }
     },
     [addMessage],
@@ -174,8 +352,22 @@ export function LetterAssistant() {
         setPreview(null);
         addMessage("Data berubah — pratinjau lama tidak berlaku lagi.");
       }
+
+      // Sync field update to backend session
+      if (sessionId && isBackendConnected && value.trim()) {
+        void sendChatMessage(sessionId, {
+          directFieldUpdates: { [key]: value },
+        })
+          .then((res) => {
+            if (res.draft) {
+              setDraft(res.draft);
+              setDraftSavedAt(timeNow());
+            }
+          })
+          .catch(() => {});
+      }
     },
-    [preview, addMessage],
+    [preview, sessionId, isBackendConnected, addMessage],
   );
 
   const userFields = useMemo(
@@ -197,7 +389,11 @@ export function LetterAssistant() {
       setStatus("saving");
       try {
         const payload = {
-          title: ((fields["nama_kegiatan"] ?? "").trim() || template.name || "Draf Surat").slice(0, 300),
+          title: (
+            (fields["nama_kegiatan"] ?? "").trim() ||
+            template.name ||
+            "Draf Surat"
+          ).slice(0, 300),
           fields: Object.fromEntries(
             userFields.map((field) => [field.key, fields[field.key] ?? ""]),
           ),
@@ -256,14 +452,23 @@ export function LetterAssistant() {
       };
       let snapshot = await queuePreview(current.id, request);
       let attempts = 0;
-      while (!cancelled.current && ["Pending", "Processing"].includes(snapshot.state) && attempts < 40) {
+      while (
+        !cancelled.current &&
+        ["Pending", "Processing"].includes(snapshot.state) &&
+        attempts < 40
+      ) {
         await new Promise((resolve) => setTimeout(resolve, 2000));
         snapshot = await getPreview(current.id, snapshot.jobId);
         attempts += 1;
       }
       if (snapshot.state === "Ready") {
         setPreview(snapshot);
-        addMessage("Pratinjau PDF siap. Periksa dokumen sebelum mengajukan.", "bot", "success");
+        addMessage(
+          "Pratinjau PDF siap. Periksa dokumen di panel kanan sebelum mengajukan.",
+          "bot",
+          "success",
+          "pdf",
+        );
       } else if (snapshot.state === "Failed") {
         addMessage(
           `Pratinjau gagal diproses (${snapshot.errorCode ?? "renderer"}). Periksa data lalu coba lagi.`,
@@ -271,17 +476,33 @@ export function LetterAssistant() {
           "error",
         );
       } else {
-        addMessage("Pratinjau masih diproses server. Coba cek kembali sesaat lagi.", "bot", "error");
+        addMessage(
+          "Pratinjau masih diproses server. Coba cek kembali sesaat lagi.",
+          "bot",
+          "error",
+        );
       }
     } catch (cause) {
       addMessage(errorText(cause, "Pratinjau tidak dapat dibuat."), "bot", "error");
     } finally {
       setStatus("idle");
     }
-  }, [template, routingComplete, draft, dirty, organizationId, committeeChairId, organizationChairId, resourceId, saveDraft, addMessage]);
+  }, [
+    template,
+    routingComplete,
+    draft,
+    dirty,
+    organizationId,
+    committeeChairId,
+    organizationChairId,
+    resourceId,
+    saveDraft,
+    addMessage,
+  ]);
 
   const submit = useCallback(async () => {
-    if (!draft || !preview || !preview.reviewDocumentId || !preview.reviewHash) return;
+    if (!draft || !preview || !preview.reviewDocumentId || !preview.reviewHash)
+      return;
     setStatus("submitting");
     try {
       const result = await submitLetter(
@@ -312,70 +533,170 @@ export function LetterAssistant() {
       setStatus("idle");
       addMessage(errorText(cause, "Pengajuan gagal dikirim."), "bot", "error");
     }
-  }, [draft, preview, organizationId, committeeChairId, organizationChairId, resourceId, template, addMessage]);
+  }, [
+    draft,
+    preview,
+    organizationId,
+    committeeChairId,
+    organizationChairId,
+    resourceId,
+    template,
+    addMessage,
+  ]);
 
-  const handleSend = useCallback(() => {
-    const raw = input.trim();
-    if (!raw) return;
-    setInput("");
-    addMessage(raw, "user");
-    if (!template) {
-      addMessage("Pilih tipe surat terlebih dahulu dari daftar template.", "bot", "error");
-      return;
-    }
-    const parts = raw
-      .split(/[;\n]+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-    const applied: string[] = [];
-    const unmatched: string[] = [];
-    for (const part of parts) {
-      const separator = part.indexOf(":");
-      if (separator <= 0) {
-        unmatched.push(part);
-        continue;
-      }
-      const label = part.slice(0, separator).trim().toLowerCase();
-      const value = part.slice(separator + 1).trim();
-      const match = userFields.find(
-        (field) =>
-          field.key.toLowerCase() === label ||
-          field.label.toLowerCase().includes(label) ||
-          label.includes(field.label.toLowerCase()),
-      );
-      if (!match || !value) {
-        unmatched.push(part);
-        continue;
-      }
-      updateField(match.key, value);
-      applied.push(match.label);
-    }
-    if (applied.length > 0) {
-      addMessage(`Data diisi ke formulir: ${applied.join(", ")}.`);
-    }
-    if (unmatched.length > 0) {
-      addMessage(
-        `Baris berikut tidak dikenali: ${unmatched.join(" | ")}. Ekstraksi bahasa alami penuh menunggu API asisten backend; gunakan format "Label: nilai".`,
-        "bot",
-        "error",
-      );
-    }
-  }, [input, template, userFields, updateField, addMessage]);
+  const handleSend = useCallback(
+    async (customText?: string) => {
+      const raw = (customText ?? input).trim();
+      if (!raw || isBotThinking) return;
 
-  const committeeLabel =
-    candidates.find((c) => c.userId === committeeChairId);
-  const organizationChairLabel =
-    candidates.find((c) => c.userId === organizationChairId);
-  const ketupelCandidates = candidates.filter((c) => c.positionCode === "Ketupel");
+      if (!customText) setInput("");
+      addMessage(raw, "user");
+
+      // 1. Backend Orchestration Path
+      if (sessionId && isBackendConnected) {
+        setIsBotThinking(true);
+        try {
+          const response = await sendChatMessage(sessionId, {
+            text: raw,
+            directFieldUpdates: null,
+          });
+          setIsBotThinking(false);
+
+          if (response.reply?.text) {
+            addMessage(
+              response.reply.text,
+              "bot",
+              undefined,
+              response.reply.widget ?? undefined,
+            );
+          }
+
+          if (response.fields && Object.keys(response.fields).length > 0) {
+            setFields((prev) => ({ ...prev, ...response.fields }));
+            setDirty(true);
+          }
+
+          if (response.draft) {
+            setDraft(response.draft);
+            setDraftSavedAt(timeNow());
+            setDirty(false);
+          }
+
+          if (
+            response.typeId &&
+            (!template || template.typeId !== response.typeId)
+          ) {
+            const matched = templates.find((t) => t.typeId === response.typeId);
+            if (matched) setTemplate(matched);
+          }
+
+          if (response.suggestedWidget) {
+            setSuggestedWidget(response.suggestedWidget);
+          }
+          return;
+        } catch {
+          setIsBotThinking(false);
+          // Transition to local fallback if backend failed
+        }
+      }
+
+      // 2. Resilient Local Simulation Fallback
+      if (!template) {
+        addMessage(
+          "Pilih tipe surat terlebih dahulu dari daftar template di atas.",
+          "bot",
+          "error",
+        );
+        return;
+      }
+
+      const parts = raw
+        .split(/[;\n]+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const applied: string[] = [];
+      const unmatched: string[] = [];
+      for (const part of parts) {
+        const separator = part.indexOf(":");
+        if (separator <= 0) {
+          unmatched.push(part);
+          continue;
+        }
+        const label = part.slice(0, separator).trim().toLowerCase();
+        const value = part.slice(separator + 1).trim();
+        const match = userFields.find(
+          (field) =>
+            field.key.toLowerCase() === label ||
+            field.label.toLowerCase().includes(label) ||
+            label.includes(field.label.toLowerCase()),
+        );
+        if (!match || !value) {
+          unmatched.push(part);
+          continue;
+        }
+        updateField(match.key, value);
+        applied.push(match.label);
+      }
+      if (applied.length > 0) {
+        addMessage(`Data dicatat ke formulir: ${applied.join(", ")}.`);
+      }
+      if (unmatched.length > 0) {
+        addMessage(
+          `Catatan tambahan Anda disimpan: "${unmatched.join(" | ")}".`,
+          "bot",
+        );
+      }
+    },
+    [
+      input,
+      isBotThinking,
+      sessionId,
+      isBackendConnected,
+      template,
+      templates,
+      userFields,
+      updateField,
+      addMessage,
+    ],
+  );
+
+  const committeeLabel = candidates.find((c) => c.userId === committeeChairId);
+  const organizationChairLabel = candidates.find(
+    (c) => c.userId === organizationChairId,
+  );
+  const ketupelCandidates = candidates.filter(
+    (c) => c.positionCode === "Ketupel",
+  );
   const chairCandidates = candidates.filter(
     (c) => c.positionCode === "KetuaOrganisasi",
   );
   const organizationLabel = organizations.find((o) => o.id === organizationId);
   const resourceLabel = resources.find((r) => r.id === resourceId);
 
-  const canSave = Boolean(template) && missingRequired.length === 0 && status === "idle";
+  const canSave =
+    Boolean(template) && missingRequired.length === 0 && status === "idle";
   const canGenerate = canSave && routingComplete;
   const canSubmit = Boolean(preview) && !dirty && status === "idle";
+
+  // Dynamic quick suggestions capped at 3 (Hick's law)
+  const quickSuggestions = useMemo(() => {
+    const list: string[] = [];
+    if (!template) {
+      list.push("Peminjaman Ruangan & Fasilitas");
+      list.push("Dispensasi Kuliah");
+      list.push("Permohonan Dana");
+      return list;
+    }
+    const emptyKeys = missingRequired.map((f) => f.label);
+    if (emptyKeys.length > 0) {
+      list.push(`Lengkapi ${emptyKeys[0]}`);
+    }
+    if (!organizationId) {
+      list.push("Pilih Organisasi Pemohon");
+    }
+    list.push("Apa saja data yang masih kurang?");
+    return list.slice(0, 3);
+  }, [template, missingRequired, organizationId]);
 
   return (
     <div className="flex h-screen min-w-[1240px] bg-canvas text-midnight selection:bg-blue-100">
@@ -388,25 +709,59 @@ export function LetterAssistant() {
         />
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(480px,3fr)_minmax(360px,2fr)] gap-6 p-6 lg:p-7 overflow-hidden">
+          {/* Chat Workspace (Left) */}
           <section
             aria-label="Asisten surat"
-            className="flex min-h-0 flex-col rounded-xl border border-line bg-white shadow-card"
+            className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-white shadow-card"
           >
-            <div className="border-b border-line px-5 py-4">
-              <h1 className="text-title font-bold text-midnight">Asisten Surat</h1>
-              <p className="mt-0.5 text-micro text-slate-500">
-                Pilih template dari katalog backend, isi schema, lalu susun
-                pratinjau resmi sebelum diajukan.
-              </p>
+            {/* Header with backend connection indicator */}
+            <div className="flex items-center justify-between border-b border-line px-5 py-3.5 bg-canvas/40">
+              <div className="flex items-center gap-2.5">
+                <SignItIcon size={32} className="size-8 rounded-lg shadow-card" />
+                <div>
+                  <h1 className="text-body font-bold text-midnight leading-tight">
+                    Asisten Pembuat Surat
+                  </h1>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                    <span
+                      className={`size-2 rounded-full ${
+                        isBackendConnected === true
+                          ? "bg-emerald-500"
+                          : isBackendConnected === false
+                          ? "bg-amber-500"
+                          : "bg-slate-300"
+                      }`}
+                    />
+                    <span>
+                      {isBackendConnected === true
+                        ? "Terhubung ke AI Assistant Backend & SSO"
+                        : isBackendConnected === false
+                        ? "Mode Simulasi Lokal (Offline)"
+                        : "Menghubungkan ke backend…"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              {template && (
+                <span className="rounded-full bg-review-bg px-2.5 py-1 text-[11px] font-semibold text-review ring-1 ring-amber-300/60">
+                  Mode: {template.name}
+                </span>
+              )}
             </div>
 
-            <div className="scroll-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            {/* Scrollable Message List */}
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4"
+            >
               {templatesError && (
                 <p className="rounded-lg border border-revision-border bg-revision-bg px-3 py-2 text-body text-revision">
                   {templatesError}
                 </p>
               )}
 
+              {/* Template Selection Pills */}
               <div className="flex flex-wrap gap-2">
                 {templates.map((option) => {
                   const active = template?.typeId === option.typeId;
@@ -414,89 +769,133 @@ export function LetterAssistant() {
                     <button
                       key={option.typeId}
                       type="button"
-                      onClick={() => selectTemplate(option)}
-                      className={`inline-flex h-11 items-center rounded-full border px-4 text-micro font-semibold transition-colors cursor-pointer ${
+                      onClick={() => void selectTemplate(option)}
+                      className={`inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-micro font-semibold transition-all cursor-pointer ${
                         active
-                          ? "border-navy bg-navy text-white"
-                          : "border-line bg-white text-midnight hover:bg-slate-50"
+                          ? "bg-navy text-white shadow-card ring-2 ring-navy/20"
+                          : "bg-white text-slate-700 ring-1 ring-line hover:bg-slate-50"
                       }`}
                     >
-                      {option.name}
+                      {active && (
+                        <CheckIcon className="size-3 text-gold" strokeWidth={3} />
+                      )}
+                      <span>{option.name}</span>
                     </button>
                   );
                 })}
-                {!templatesError && templates.length === 0 && (
-                  <p className="text-micro text-slate-500">Memuat katalog template…</p>
-                )}
               </div>
 
+              {/* Chat Message Bubbles */}
               {messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${message.from === "user" ? "justify-end" : "justify-start"}`}
+                  className={`animate-rise flex ${
+                    message.from === "user" ? "justify-end" : "justify-start"
+                  }`}
                 >
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-body leading-relaxed ${
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 text-body leading-relaxed shadow-2xs ${
                       message.from === "user"
-                        ? "bg-navy text-white"
+                        ? "rounded-tr-md bg-navy text-white"
                         : message.tone === "error"
-                        ? "bg-revision-bg text-revision ring-1 ring-revision-border"
+                        ? "rounded-tl-md bg-revision-bg text-revision ring-1 ring-revision-border"
                         : message.tone === "success"
-                        ? "bg-approved-bg text-approved ring-1 ring-approved-border"
-                        : "bg-canvas text-slate-700 ring-1 ring-line"
+                        ? "rounded-tl-md bg-approved-bg text-approved ring-1 ring-approved-border"
+                        : "rounded-tl-md bg-canvas text-slate-700 ring-1 ring-line"
                     }`}
                   >
-                    {message.text}
+                    <div>{message.text}</div>
                     <div
-                      className={`mt-1 text-[10px] ${
-                        message.from === "user" ? "text-slate-300" : "text-slate-400"
+                      className={`mt-1 flex items-center gap-1 text-[10px] ${
+                        message.from === "user"
+                          ? "justify-end text-slate-300"
+                          : "text-slate-400"
                       }`}
                     >
-                      {message.timestamp}
+                      <span>{message.timestamp}</span>
+                      {message.from === "user" && (
+                        <CheckCheckIcon className="size-3 text-emerald-400" />
+                      )}
                     </div>
                   </div>
                 </div>
               ))}
+
+              {/* AI Thinking Indicator (Doherty Threshold) */}
+              {isBotThinking && (
+                <div className="animate-rise flex items-center gap-2 rounded-2xl rounded-tl-md bg-canvas px-4 py-3 ring-1 ring-line w-fit">
+                  <SignItIcon size={20} className="size-5 rounded" />
+                  <span className="text-[11px] font-medium text-slate-500">
+                    Asisten AI sedang mengekstrak data &amp; memeriksa sistem…
+                  </span>
+                  <span className="flex items-center gap-1">
+                    {[0, 150, 300].map((delay) => (
+                      <span
+                        key={delay}
+                        className="size-1.5 animate-bounce rounded-full bg-slate-400"
+                        style={{ animationDelay: `${delay}ms` }}
+                      />
+                    ))}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="border-t border-line px-5 py-4 space-y-3">
+            {/* Floating Scroll to Bottom Button */}
+            {showScrollBottom && (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="animate-rise absolute bottom-28 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-midnight/90 backdrop-blur px-3.5 py-1.5 text-micro font-semibold text-white shadow-lift hover:bg-midnight cursor-pointer transition-all z-10"
+              >
+                <ArrowDownIcon className="size-3.5 text-gold" />
+                <span>Pesan Terbaru</span>
+              </button>
+            )}
+
+            {/* Input & Routing Bar */}
+            <div className="border-t border-line px-5 py-3.5 space-y-3 bg-white">
+              {/* Routing Selectors when template is active */}
               {template && (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {organizationsLoaded && organizations.length === 0 && (
-                    <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 sm:col-span-2">
-                      Akun ini belum memiliki assignment pengaju pada organisasi
-                      mana pun, sehingga katalog organisasi kosong. Gunakan akun
-                      pengaju organisasi (mis. pengaju-bem@demo.signit.example),
-                      atau minta tim menambahkan assignment Requester untuk akun
-                      ini.
-                    </p>
-                  )}
                   <label className="space-y-1 text-micro font-medium text-slate-600">
-                    Organisasi
+                    Organisasi Pemohon
                     <select
                       value={organizationId}
                       onChange={(event) => {
-                        setOrganizationId(event.target.value);
-                        void loadCandidates(event.target.value);
+                        const orgId = event.target.value;
+                        setOrganizationId(orgId);
+                        void loadCandidates(orgId);
+                        const org = organizations.find((o) => o.id === orgId);
+                        if (org) {
+                          addMessage(`Organisasi pemohon: ${org.name}`, "user");
+                        }
                       }}
-                      className="h-11 w-full rounded-lg border border-line bg-white px-3 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10"
+                      className="h-10 w-full rounded-lg border border-line bg-white px-2.5 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10 text-midnight"
                     >
                       <option value="">Pilih organisasi…</option>
-                      {organizations.map((organization) => (
-                        <option key={organization.id} value={organization.id}>
-                          {organization.name}
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
                         </option>
                       ))}
                     </select>
                   </label>
 
                   <label className="space-y-1 text-micro font-medium text-slate-600">
-                    Ketua Pelaksana (Ketupel)
+                    Ketua Pelaksana
                     {ketupelCandidates.length > 1 ? (
                       <select
                         value={committeeChairId}
-                        onChange={(event) => setCommitteeChairId(event.target.value)}
-                        className="h-11 w-full rounded-lg border border-line bg-white px-3 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10"
+                        onChange={(event) => {
+                          const candId = event.target.value;
+                          setCommitteeChairId(candId);
+                          const cand = candidates.find((c) => c.userId === candId);
+                          if (cand) {
+                            addMessage(`Ketua Pelaksana: ${cand.name}`, "user");
+                          }
+                        }}
+                        className="h-10 w-full rounded-lg border border-line bg-white px-2.5 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10 text-midnight"
                       >
                         <option value="">Pilih ketua…</option>
                         {ketupelCandidates.map((candidate) => (
@@ -506,34 +905,10 @@ export function LetterAssistant() {
                         ))}
                       </select>
                     ) : (
-                      <div className="flex h-11 items-center rounded-lg border border-line bg-canvas px-3 text-body text-midnight">
+                      <div className="flex h-10 items-center rounded-lg border border-line bg-canvas px-3 text-body text-midnight truncate">
                         {ketupelCandidates[0]
                           ? `${ketupelCandidates[0].name} — ${ketupelCandidates[0].positionName}`
-                          : "Terisi otomatis setelah organisasi dipilih"}
-                      </div>
-                    )}
-                  </label>
-
-                  <label className="space-y-1 text-micro font-medium text-slate-600">
-                    Ketua Organisasi
-                    {chairCandidates.length > 1 ? (
-                      <select
-                        value={organizationChairId}
-                        onChange={(event) => setOrganizationChairId(event.target.value)}
-                        className="h-11 w-full rounded-lg border border-line bg-white px-3 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10"
-                      >
-                        <option value="">Pilih ketua organisasi…</option>
-                        {chairCandidates.map((candidate) => (
-                          <option key={candidate.userId} value={candidate.userId}>
-                            {candidate.name} — {candidate.positionName}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="flex h-11 items-center rounded-lg border border-line bg-canvas px-3 text-body text-midnight">
-                        {chairCandidates[0]
-                          ? `${chairCandidates[0].name} — ${chairCandidates[0].positionName}`
-                          : "Terisi otomatis setelah organisasi dipilih"}
+                          : "Pilih organisasi pemohon terlebih dahulu"}
                       </div>
                     )}
                   </label>
@@ -545,29 +920,47 @@ export function LetterAssistant() {
                         <select
                           value={facilityId}
                           onChange={(event) => void selectFacility(event.target.value)}
-                          className="h-11 w-full rounded-lg border border-line bg-white px-3 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10"
+                          className="h-10 w-full rounded-lg border border-line bg-white px-2.5 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10 text-midnight"
                         >
                           <option value="">Pilih fasilitas…</option>
-                          {facilities.map((facility) => (
-                            <option key={facility.id} value={facility.id}>
-                              {facility.name}
+                          {facilities.map((fac) => (
+                            <option key={fac.id} value={fac.id}>
+                              {fac.name}
                             </option>
                           ))}
                         </select>
                       </label>
                       <label className="space-y-1 text-micro font-medium text-slate-600">
-                        Ruangan
+                        Ruangan / Fasilitas
                         <select
                           value={resourceId}
-                          onChange={(event) => setResourceId(event.target.value)}
+                          onChange={(event) => {
+                            const resId = event.target.value;
+                            setResourceId(resId);
+                            const res = resources.find((r) => r.id === resId);
+                            if (res) {
+                              addMessage(`Ruangan: ${res.code}`, "user");
+                              if (sessionId && isBackendConnected) {
+                                void sendChatMessage(sessionId, {
+                                  text: `Ruangan: ${res.code}`,
+                                  directFieldUpdates: {
+                                    resourceId: resId,
+                                    ruangan: res.code,
+                                  },
+                                });
+                              }
+                            }
+                          }}
                           disabled={resources.length === 0}
-                          className="h-11 w-full rounded-lg border border-line bg-white px-3 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10 disabled:bg-slate-50"
+                          className="h-10 w-full rounded-lg border border-line bg-white px-2.5 text-body outline-none focus:border-navy focus:ring-4 focus:ring-navy/10 disabled:bg-slate-50 text-midnight"
                         >
                           <option value="">Pilih ruangan…</option>
                           {resources.map((resource) => (
                             <option key={resource.id} value={resource.id}>
                               {resource.code}
-                              {resource.floor !== null ? ` · lantai ${resource.floor}` : ""}
+                              {resource.floor !== null
+                                ? ` · lantai ${resource.floor}`
+                                : ""}
                             </option>
                           ))}
                         </select>
@@ -577,6 +970,23 @@ export function LetterAssistant() {
                 </div>
               )}
 
+              {/* Quick suggestion chips (max 3, Hick's law) */}
+              <div className="flex flex-wrap gap-1.5">
+                {quickSuggestions.map((sug) => (
+                  <button
+                    key={sug}
+                    type="button"
+                    onClick={() => void handleSend(sug)}
+                    disabled={isBotThinking}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-full bg-canvas px-3 text-micro font-semibold text-slate-600 ring-1 ring-line hover:bg-blue-50 hover:text-navy hover:ring-blue-200 disabled:opacity-50 cursor-pointer transition-all shadow-2xs"
+                  >
+                    <SparklesIcon className="size-3 text-gold shrink-0" />
+                    <span>{sug}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Text Input & Send Button */}
               <div className="flex items-end gap-2">
                 <textarea
                   value={input}
@@ -584,39 +994,48 @@ export function LetterAssistant() {
                   onKeyDown={(event) => {
                     if (event.key === "Enter" && !event.shiftKey) {
                       event.preventDefault();
-                      handleSend();
+                      void handleSend();
                     }
                   }}
                   rows={2}
-                  placeholder={'Isi cepat formulir, contoh:\nnama kegiatan: Buka Bersama; tanggal surat: 18 Oktober 2026'}
-                  className="min-h-[64px] flex-1 resize-none rounded-lg border border-line bg-white px-3 py-2 text-body outline-none placeholder:text-slate-400 focus:border-navy focus:ring-4 focus:ring-navy/10"
+                  placeholder={
+                    template
+                      ? 'Ketik detail permohonan, atau tanyakan field yang kurang…'
+                      : 'Ketik tipe surat atau keperluan izin Anda…'
+                  }
+                  className="min-h-[52px] max-h-32 flex-1 resize-none rounded-xl border border-line bg-white px-3 py-2 text-body outline-none placeholder:text-slate-400 focus:border-navy focus:ring-4 focus:ring-navy/10"
                 />
                 <Button
                   type="button"
-                  onClick={handleSend}
-                  aria-label="Kirim data ke formulir"
-                  className="h-11 shrink-0"
+                  onClick={() => void handleSend()}
+                  disabled={!input.trim() || isBotThinking}
+                  aria-label="Kirim pesan"
+                  className="h-11 w-11 shrink-0 rounded-xl bg-navy text-white shadow-lift hover:bg-[#1a3278] disabled:opacity-50 cursor-pointer p-0 flex items-center justify-center"
                 >
-                  <SendIcon className="size-4" />
+                  <SendIcon className="size-4.5" />
                 </Button>
               </div>
-              <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <SparklesIcon className="size-3.5" />
-                Ekstraksi bahasa alami penuh menunggu API asisten di backend.
-                Saat ini format “Label: nilai” mengisi schema secara langsung.
-                <CheckIcon className="ml-auto size-3.5 text-approved" />
-                Draft &amp; preview disimpan di server.
-              </p>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span>
+                  <kbd className="font-mono">Enter</kbd> kirim ·{" "}
+                  <kbd className="font-mono">Shift+Enter</kbd> baris baru
+                </span>
+                <span>Asisten SignIt! AI v2.0</span>
+              </div>
             </div>
           </section>
 
+          {/* Right Pane (Draft Summary & Actions) */}
           <DraftSummary
             template={template}
             fields={fields}
             onFieldChange={updateField}
             organizationLabel={organizationLabel?.name ?? null}
             committeeLabel={
-              committeeLabel ? `${committeeLabel.name} — ${committeeLabel.positionName}` : null
+              committeeLabel
+                ? `${committeeLabel.name} — ${committeeLabel.positionName}`
+                : null
             }
             organizationChairLabel={
               organizationChairLabel

@@ -347,14 +347,13 @@ export default function StudentDashboard() {
 
           {/* Right Header Actions */}
           <div className="ml-auto flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => setActiveNav("new-request")}
+            <Link
+              href="/surat/baru"
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e3a8a] px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-[#172554] cursor-pointer"
             >
               <PlusIcon size={16} />
               <span>Ajukan Surat Izin Baru</span>
-            </button>
+            </Link>
 
             <div className="h-6 w-px bg-slate-200" />
 
@@ -824,15 +823,11 @@ export default function StudentDashboard() {
                   sla: "± 1 hari kerja",
                 },
               ].map((tmpl) => (
-                <button
+                <Link
                   key={tmpl.title}
-                  type="button"
-                  onClick={() => {
-                    setShowNewLetterModal(false);
-                    setActiveNav("new-request");
-                    showNotification(`Template "${tmpl.title}" dipilih. Silakan lengkapi formulir.`);
-                  }}
-                  className="p-4 rounded-xl border border-slate-200 bg-[#f8fafc] hover:border-[#1e3a8a] hover:bg-white text-left transition group cursor-pointer shadow-xs"
+                  href="/surat/baru"
+                  onClick={() => setShowNewLetterModal(false)}
+                  className="p-4 rounded-xl border border-slate-200 bg-[#f8fafc] hover:border-[#1e3a8a] hover:bg-white text-left transition group cursor-pointer shadow-xs block"
                 >
                   <h4 className="text-xs font-semibold text-slate-900 group-hover:text-[#1e3a8a] transition-colors">
                     {tmpl.title}
@@ -843,7 +838,7 @@ export default function StudentDashboard() {
                   <span className="mt-3 inline-block text-[10px] font-medium text-slate-400">
                     Estimasi SLA: {tmpl.sla}
                   </span>
-                </button>
+                </Link>
               ))}
             </div>
 

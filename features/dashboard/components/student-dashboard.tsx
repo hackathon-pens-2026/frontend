@@ -309,7 +309,7 @@ export default function StudentDashboard() {
             if (item.id !== "dashboard") {
               const href =
                 item.id === "inbox"
-                  ? "/staff"
+                  ? "/persetujuan"
                   : item.id === "my-letters"
                   ? "/surat"
                   : "/surat/baru";
@@ -427,12 +427,12 @@ export default function StudentDashboard() {
                     >
                       <span>QR Tanda Tangan</span>
                     </button>
-                    <Link
-                      href="/manajemen"
+                    {capabilities.some((capability) => capability === "Signer" || capability === "Approver") && <Link
+                      href="/persetujuan"
                       className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-xs text-slate-700 hover:bg-slate-50 transition font-medium cursor-pointer"
                     >
-                      <span>Beralih ke Portal Staf & Manajemen</span>
-                    </Link>
+                      <span>Persetujuan Saya</span>
+                    </Link>}
                   </div>
                   <button
                     type="button"

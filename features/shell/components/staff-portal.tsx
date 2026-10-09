@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { NavView } from "../types";
 import { StaffSidebar } from "./staff-sidebar";
 import { StaffHeader } from "./staff-header";
+import { StudentSidebar } from "./student-sidebar";
 import { StaffDashboard } from "@/features/dashboard/components/staff-dashboard";
 import { InboxView } from "@/features/inbox/components/inbox-view";
 import { ApprovalStep, toInboxLetter, workflowSteps } from "@/features/inbox/types";
@@ -21,9 +22,9 @@ function describeError(cause: unknown) {
     : "Data tidak dapat dimuat dari server.";
 }
 
-export function StaffPortal() {
+export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }) {
   const router = useRouter();
-  const [view, setView] = useState<NavView>("dashboard");
+  const [view, setView] = useState<NavView>(studentInbox ? "inbox" : "dashboard");
   const [tasks, setTasks] = useState<WorkflowTaskDto[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -129,11 +130,11 @@ export function StaffPortal() {
 
   return (
     <div className="min-h-screen min-w-[1280px] bg-canvas text-midnight">
-      <StaffSidebar
+      {studentInbox ? <StudentSidebar currentPath="/persetujuan" /> : <StaffSidebar
         view={view}
         onChange={setView}
         pendingCount={pendingCount}
-      />
+      />}
 
       <div className="pl-[260px]">
         <StaffHeader

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   DashboardIcon,
   FileTextIcon,
+  InboxIcon,
   HelpCircleIcon,
   MailIcon,
   ShieldCheckIcon,
@@ -29,7 +30,7 @@ function initialsOf(name: string): string {
 }
 
 export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: StudentSidebarProps) {
-  const { user, assignments } = useSession();
+  const { user, assignments, capabilities } = useSession();
   const [qrOpen, setQrOpen] = useState(false);
 
   const displayName = user?.name ?? "Memuat profil…";
@@ -57,6 +58,8 @@ export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: Stu
       icon: FileTextIcon,
       badge: letterCount,
     },
+    ...(capabilities.some((capability) => capability === "Signer" || capability === "Approver")
+      ? [{ id: "inbox", label: "Persetujuan Saya", href: "/persetujuan", icon: InboxIcon }] : []),
   ];
 
   return (

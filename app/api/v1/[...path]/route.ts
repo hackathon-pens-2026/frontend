@@ -1,13 +1,13 @@
 import type { NextRequest } from "next/server";
 import { backendFetch } from "@/lib/server/backend";
-import { getAccessToken, refreshAuthTokens } from "@/lib/server/session";
+import { clearAuthCookies, getAccessToken, refreshAuthTokens, setAuthCookies } from "@/lib/server/session";
 import { toNetworkError } from "@/lib/api/errors";
+import type { AuthTokensDto } from "@/lib/api/types";
 
 const FORWARDED_REQUEST_HEADERS = ["content-type", "accept", "idempotency-key"];
 const FORWARDED_RESPONSE_HEADERS = [
   "content-type",
   "content-disposition",
-  "cache-control",
   "etag",
   "retry-after",
   "www-authenticate",
@@ -35,9 +35,11 @@ async function forward(
     body = buffer.byteLength > 0 ? buffer : null;
   }
 
-  const token = await getAccessToken();
+  const login = endpoint === "auth/login";
+  const publicAuth = path[0] === "auth" && endpoint !== "auth/logout";
+  const token = publicAuth ? null : await getAccessToken();
   let upstream = await backendFetch(target, { method, headers, body, token });
-  if (upstream.status === 401) {
+  if (upstream.status === 401 && !publicAuth) {
     const refreshed = await refreshAuthTokens();
     if (refreshed) {
       upstream = await backendFetch(target, {
@@ -49,7 +51,15 @@ async function forward(
     }
   }
 
+  if (login && upstream.ok) {
+    const tokens = (await upstream.json()) as AuthTokensDto;
+    await setAuthCookies(tokens);
+    return Response.json(tokens.user, { headers: { "Cache-Control": "no-store" } });
+  }
+  if (endpoint === "auth/logout" && upstream.ok) await clearAuthCookies();
+
   const responseHeaders = new Headers();
+  responseHeaders.set("Cache-Control", "no-store");
   for (const name of FORWARDED_RESPONSE_HEADERS) {
     const value = upstream.headers.get(name);
     if (value) responseHeaders.set(name, value);

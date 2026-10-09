@@ -10,12 +10,7 @@ import {
   setAuthCookies,
 } from "@/lib/server/session";
 import type { AuthFormState } from "./form-state";
-
-function sanitizeInternalPath(value: string | null): string | null {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
-  if (value.startsWith("/api") || value.startsWith("/login")) return null;
-  return value;
-}
+import { postLoginPath, sanitizeInternalPath } from "./routing";
 
 async function parseError(response: Response): Promise<AuthFormState> {
   const error = await toApiError(response);
@@ -49,7 +44,7 @@ export async function loginAction(
 
   const tokens = (await response.json()) as AuthTokensDto;
   await setAuthCookies(tokens);
-  redirect(next ?? (tokens.user.uiSurface === "Management" ? "/manajemen" : "/"));
+  redirect(postLoginPath(tokens.user, next));
 }
 
 export async function logoutAction(): Promise<void> {

@@ -1,26 +1,79 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-sidebar: #0f172a;
+  --color-midnight: #0f172a;
+  --color-line: #e2e8f0;
+  --color-navy: #1e3a8a;
+  --color-navy-hover: #172554;
+  --color-primary: #1e3a8a;
+  --color-primary-hover: #172554;
+  --color-primary-subtle: #f59e0b;
+  --color-gold: #f59e0b;
+  --color-gold-soft: #fffbeb;
+  --color-approved: #15803d;
+  --color-approved-bg: #f0fdf4;
+  --color-approved-border: #bbf7d0;
+  --color-review: #1d4ed8;
+  --color-review-bg: #eff6ff;
+  --color-review-border: #bfdbfe;
+  --color-revision: #b91c1c;
+  --color-revision-bg: #fef2f2;
+  --color-revision-border: #fecaca;
+  --color-pending: #b45309;
+  --color-pending-bg: #fffbeb;
+  --color-pending-border: #fde68a;
+  --font-sans: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar for drawers and lists */
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.scroll-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

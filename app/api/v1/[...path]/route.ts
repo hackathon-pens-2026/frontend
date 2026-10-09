@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { backendFetch } from "@/lib/server/backend";
 import { getAccessToken, refreshAuthTokens } from "@/lib/server/session";
+import { toNetworkError } from "@/lib/api/errors";
 
 const FORWARDED_REQUEST_HEADERS = ["content-type", "accept", "idempotency-key"];
 const FORWARDED_RESPONSE_HEADERS = [
@@ -12,7 +13,7 @@ const FORWARDED_RESPONSE_HEADERS = [
   "www-authenticate",
 ];
 
-async function handle(
+async function forward(
   request: NextRequest,
   context: RouteContext<"/api/v1/[...path]">,
 ): Promise<Response> {
@@ -55,6 +56,18 @@ async function handle(
     status: upstream.status,
     headers: responseHeaders,
   });
+}
+
+async function handle(request: NextRequest, context: RouteContext<"/api/v1/[...path]">): Promise<Response> {
+  try {
+    return await forward(request, context);
+  } catch (failure) {
+    const error = toNetworkError(failure);
+    return Response.json({ code: error.code, title: error.message, detail: error.message }, {
+      status: error.status || 502,
+      headers: { "Cache-Control": "no-store" },
+    });
+  }
 }
 
 export {

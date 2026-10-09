@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { toApiError } from "@/lib/api/errors";
+import { ApiError, toApiError } from "@/lib/api/errors";
 import type { AuthTokensDto } from "@/lib/api/types";
 import { backendFetch } from "@/lib/server/backend";
 import {
@@ -42,8 +42,8 @@ export async function loginAction(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-  } catch {
-    return { status: "error", message: "Tidak dapat menghubungi server. Coba kembali." };
+  } catch (error) {
+    return { status: "error", message: error instanceof ApiError ? error.message : "Tidak dapat menghubungi server. Coba kembali." };
   }
   if (!response.ok) return await parseError(response);
 

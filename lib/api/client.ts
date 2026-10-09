@@ -44,10 +44,10 @@ export async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
-export async function apiDownload(path: string): Promise<Blob> {
+export async function apiDownload(path: string, signal?: AbortSignal): Promise<Blob> {
   let response: Response;
   try {
-    response = await fetch(`${API_PREFIX}${path}`, { cache: "no-store" });
+    response = await fetch(`${API_PREFIX}${path}`, { cache: "no-store", signal });
   } catch (error) {
     throw toNetworkError(error);
   }

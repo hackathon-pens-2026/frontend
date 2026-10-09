@@ -12,6 +12,7 @@ import {
   FileTextIcon,
   PenToolIcon,
   PlusIcon,
+  SignItIcon,
   SparklesIcon,
   UploadCloudIcon,
 } from "@/components/ui";
@@ -366,9 +367,11 @@ export function ChatPane({
 
 function BotBadge() {
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-navy to-midnight text-gold shadow-card">
-      <PenToolIcon className="size-4 text-gold" />
-    </span>
+    <SignItIcon
+      size={32}
+      className="size-8 rounded-lg shadow-card ring-1 ring-white/10"
+      alt="Asisten SignIt!"
+    />
   );
 }
 export default ChatPane;

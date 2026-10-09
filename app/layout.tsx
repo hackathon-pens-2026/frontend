@@ -10,8 +10,13 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SignIt! — Student Portal",
+  title: "SignIt! — Digital Campus Approval",
   description: "Pantau kelancaran birokrasi dan status surat izinmu secara real-time.",
+  icons: {
+    icon: "/signit_icon.svg",
+    shortcut: "/signit_icon.svg",
+    apple: "/signit_icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

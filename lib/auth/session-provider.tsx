@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { apiFetch, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import { logoutAction } from "@/lib/auth/actions";
 import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
+import { routeRedirect } from "./routing";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";
@@ -76,6 +77,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       router.replace("/");
     }
   }, [pathname, router]);
+
+  // Enforce role-based route access
+  useEffect(() => {
+    const redirect = routeRedirect(user, pathname);
+    if (redirect && redirect !== pathname) {
+      router.replace(redirect);
+    }
+  }, [user, pathname, router]);
 
   // Switch user callback
   const switchUser = useCallback((personaId: string) => {

@@ -31,7 +31,45 @@
   --color-pending: #b45309;
   --color-pending-bg: #fffbeb;
   --color-pending-border: #fde68a;
+  --color-ok: #10b981;
+  --color-ok-bg: #ecfdf5;
+  --color-reject: #ef4444;
+  --color-reject-bg: #fef2f2;
+  --color-delegate: #8b5cf6;
+  --color-delegate-bg: #f5f3ff;
   --font-sans: var(--font-plus-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@utility text-display {
+  font-size: 28px;
+  line-height: 36px;
+}
+
+@utility text-title {
+  font-size: 20px;
+  line-height: 28px;
+}
+
+@utility text-body {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+@utility text-micro {
+  font-size: 12px;
+  line-height: 16px;
+}
+
+@utility shadow-card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+@utility shadow-lift {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+@utility shadow-modal {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
 html {

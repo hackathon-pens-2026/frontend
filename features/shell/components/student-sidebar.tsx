@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   DashboardIcon,
@@ -10,13 +10,32 @@ import {
   PenToolIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  XIcon,
 } from "@/components/ui";
+import { useSession } from "@/lib/auth/session-provider";
+import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
 
 interface StudentSidebarProps {
   currentPath?: string;
+  letterCount?: number;
 }
 
-export function StudentSidebar({ currentPath = "/surat/baru" }: StudentSidebarProps) {
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  const first = parts[0]?.[0] ?? "";
+  const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + second).toUpperCase();
+}
+
+export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: StudentSidebarProps) {
+  const { user, assignments } = useSession();
+  const [qrOpen, setQrOpen] = useState(false);
+
+  const displayName = user?.name ?? "Memuat profil…";
+  const identityNumber = user?.nimNip ?? user?.email ?? "";
+  const primaryPosition = assignments[0]?.positionName ?? "Mahasiswa PENS";
+
   const navItems = [
     {
       id: "dashboard",
@@ -34,9 +53,9 @@ export function StudentSidebar({ currentPath = "/surat/baru" }: StudentSidebarPr
     {
       id: "letters",
       label: "Surat Saya",
-      href: "/#my-letters",
+      href: "/surat",
       icon: FileTextIcon,
-      badge: 3,
+      badge: letterCount,
     },
   ];
 
@@ -65,30 +84,68 @@ export function StudentSidebar({ currentPath = "/surat/baru" }: StudentSidebarPr
         <div className="flex items-center gap-3">
           <div className="relative">
             <span className="flex size-9 items-center justify-center rounded-full bg-navy text-micro font-bold text-white ring-1 ring-white/20">
-              MF
+              {initialsOf(displayName)}
             </span>
             <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-midnight bg-emerald-500" />
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-body font-semibold text-white">
-              M. Fajrul
+              {displayName}
             </div>
             <div className="truncate font-mono text-[11px] text-slate-400">
-              2103191001
+              {identityNumber}
             </div>
           </div>
         </div>
 
         <div className="mt-2.5 flex items-center justify-between border-t border-white/10 pt-2">
           <span className="max-w-[120px] truncate text-[11px] text-slate-400">
-            D4 T. Informatika
+            {primaryPosition}
           </span>
           <span className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
             <ShieldCheckIcon className="size-3 text-emerald-400" />
-            <span>SSO Valid</span>
+            <span>Sesi Aktif</span>
           </span>
         </div>
       </div>
+
+      {/* QR Tanda Tangan */}
+      <button
+        type="button"
+        onClick={() => setQrOpen(true)}
+        className="mb-5 flex h-11 w-full items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-body font-medium text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer"
+      >
+        <ShieldCheckIcon className="size-[18px] text-gold" />
+        <span>QR Tanda Tangan</span>
+      </button>
+
+      {qrOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="QR tanda tangan"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-midnight/60 p-4 backdrop-blur-sm"
+          onClick={() => setQrOpen(false)}
+        >
+          <div
+            className="animate-rise w-full max-w-sm rounded-xl bg-white p-5 text-midnight shadow-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-title font-semibold">QR Tanda Tangan</h2>
+              <button
+                type="button"
+                aria-label="Tutup"
+                onClick={() => setQrOpen(false)}
+                className="flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
+              >
+                <XIcon className="size-4" />
+              </button>
+            </div>
+            <SignatureQrPanel />
+          </div>
+        </div>
+      )}
 
       {/* Nav Menu */}
       <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
@@ -98,6 +155,7 @@ export function StudentSidebar({ currentPath = "/surat/baru" }: StudentSidebarPr
         {navItems.map((item) => {
           const isActive =
             (item.href === "/surat/baru" && currentPath === "/surat/baru") ||
+            (item.href === "/surat" && currentPath === "/surat") ||
             (item.href === "/" && currentPath === "/");
 
           return (

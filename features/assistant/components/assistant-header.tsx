@@ -9,23 +9,26 @@ import {
   ClockIcon,
   FileTextIcon,
   MailIcon,
-  PenToolIcon,
 } from "@/components/ui";
+import { useSession } from "@/lib/auth/session-provider";
 
 interface AssistantHeaderProps {
   isSaving?: boolean;
-  lastSavedTime?: string;
-  userName?: string;
+  lastSavedTime?: string | null;
 }
 
 export function AssistantHeader({
   isSaving = false,
-  lastSavedTime = "14:20",
-  userName = "M. Fajrul",
+  lastSavedTime = null,
 }: AssistantHeaderProps) {
+  const { user } = useSession();
+  const userName = user?.name ?? "Mahasiswa";
+  const savedLabel = lastSavedTime
+    ? `Draf tersimpan · ${lastSavedTime}`
+    : "Draf belum disimpan";
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-white px-8">
-      {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-body">
         <Link
           href="/"
@@ -35,23 +38,22 @@ export function AssistantHeader({
         </Link>
         <ChevronRightIcon className="size-3.5 text-slate-300" />
         <Link
-          href="/#my-letters"
+          href="/surat"
           className="font-medium text-slate-500 hover:text-navy transition-colors"
         >
           Surat Saya
         </Link>
         <ChevronRightIcon className="size-3.5 text-slate-300" />
-        <span className="font-semibold text-midnight">
-          Buat Surat Baru (Asisten AI)
-        </span>
+        <span className="font-semibold text-midnight">Buat Surat Baru</span>
       </nav>
 
-      {/* Auto-save status */}
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-micro font-semibold transition-colors ${
           isSaving
             ? "bg-slate-100 text-slate-500"
-            : "bg-green-50 text-green-800 ring-1 ring-green-200"
+            : lastSavedTime
+            ? "bg-green-50 text-green-800 ring-1 ring-green-200"
+            : "bg-slate-100 text-slate-500"
         }`}
       >
         {isSaving ? (
@@ -59,12 +61,9 @@ export function AssistantHeader({
         ) : (
           <CheckIcon className="size-3.5" />
         )}
-        <span>
-          {isSaving ? "Menyimpan…" : `Draf Tersimpan Otomatis · ${lastSavedTime}`}
-        </span>
+        <span>{isSaving ? "Menyimpan…" : savedLabel}</span>
       </span>
 
-      {/* Right action & user profile */}
       <div className="ml-auto flex items-center gap-5">
         <span
           className="hidden sm:inline-flex items-center gap-1.5 text-micro text-slate-400"
@@ -79,7 +78,7 @@ export function AssistantHeader({
           className="hidden md:inline-flex items-center gap-1.5 text-body font-semibold text-navy hover:underline"
         >
           <FileTextIcon className="size-4" />
-          <span>Beralih ke Formulir Manual</span>
+          <span>Kembali ke Dasbor</span>
         </Link>
 
         <Avatar name={userName} size={32} />

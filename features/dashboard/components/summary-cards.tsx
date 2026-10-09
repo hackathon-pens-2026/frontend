@@ -3,46 +3,11 @@ import { SummaryMetric } from "../types";
 import { ClockIcon, HourglassIcon, CheckCircleIcon, TimerIcon } from "./icons";
 
 interface SummaryCardsProps {
-  metrics?: SummaryMetric[];
+  metrics: SummaryMetric[];
   onSelectMetric?: (id: string) => void;
 }
 
-const defaultMetrics: SummaryMetric[] = [
-  {
-    id: "active",
-    title: "Surat Sedang Berjalan",
-    value: "3",
-    subtitle: "1 di tahap akhir persetujuan",
-    variant: "info",
-  },
-  {
-    id: "waiting",
-    title: "Menunggu Respon Approver",
-    value: "2",
-    subtitle: "Respon tercepat: BEM PENS",
-    variant: "warning",
-  },
-  {
-    id: "approved",
-    title: "Surat Disetujui (Siap Cetak/QR)",
-    value: "14",
-    subtitle: "+3 pengajuan bulan ini",
-    variant: "success",
-  },
-  {
-    id: "speed",
-    title: "Rata-rata Waktu Selesai",
-    value: "1.8 Hari",
-    subtitle: "vs 5 hari manual",
-    badge: {
-      label: "64% lebih cepat",
-      variant: "success",
-    },
-    variant: "neutral",
-  },
-];
-
-export function SummaryCards({ metrics = defaultMetrics, onSelectMetric }: SummaryCardsProps) {
+export function SummaryCards({ metrics, onSelectMetric }: SummaryCardsProps) {
   const getIcon = (id: string) => {
     switch (id) {
       case "active":

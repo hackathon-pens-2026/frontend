@@ -10,6 +10,7 @@ import {
   PlusIcon,
   SearchIcon,
 } from "@/components/ui";
+import { useSession } from "@/lib/auth/session-provider";
 
 export interface HeaderStaffProfile {
   name: string;
@@ -32,6 +33,11 @@ export function StaffHeader({
   onSearchChange,
 }: StaffHeaderProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { user, assignments, logout } = useSession();
+
+  const displayName = user?.name ?? profile.name;
+  const displayRole = assignments[0]?.positionName ?? profile.role;
+  const displayNip = user?.nimNip ?? profile.nip;
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-white/85 px-10 lg:px-20 backdrop-blur">
@@ -64,14 +70,14 @@ export function StaffHeader({
             aria-expanded={dropdownOpen}
             className="flex h-11 items-center gap-3 rounded-lg pr-2 pl-1 hover:bg-slate-100 cursor-pointer"
           >
-            <Avatar name={profile.short} size={36} />
+            <Avatar name={displayName} size={36} />
             <div className="text-left leading-tight hidden sm:block">
               <div className="text-body font-semibold text-midnight">
-                {profile.short}
+                {displayName}
               </div>
               <div className="flex items-center gap-1 text-micro text-slate-500">
                 <span className="size-1.5 rounded-full bg-ok" />
-                <span>PENS SSO</span>
+                <span>{displayRole}</span>
               </div>
             </div>
             <ChevronDownIcon className="size-4 text-slate-400" />
@@ -81,10 +87,10 @@ export function StaffHeader({
             <div className="animate-rise absolute right-0 mt-2 w-[290px] rounded-xl border border-line bg-white p-2 shadow-modal">
               {/* User info */}
               <div className="border-b border-line px-3 pt-2 pb-3">
-                <div className="text-body font-semibold">{profile.name}</div>
-                <div className="text-micro text-slate-500">{profile.role}</div>
+                <div className="text-body font-semibold">{displayName}</div>
+                <div className="text-micro text-slate-500">{displayRole}</div>
                 <div className="mt-1 text-micro text-slate-400 tabular-nums">
-                  NIP {profile.nip}
+                  NIP/NIM {displayNip}
                 </div>
               </div>
 
@@ -99,14 +105,17 @@ export function StaffHeader({
                 </Link>
               </div>
 
-              {/* Logout SSO */}
+              {/* Logout */}
               <button
                 type="button"
-                onClick={() => setDropdownOpen(false)}
+                onClick={async () => {
+                  setDropdownOpen(false);
+                  await logout();
+                }}
                 className="mt-1 flex h-11 w-full items-center gap-2 rounded-lg px-3 text-body text-red-600 hover:bg-reject-bg cursor-pointer"
               >
                 <LogoutIcon className="size-4" />
-                <span>Keluar dari SSO</span>
+                <span>Keluar</span>
               </button>
             </div>
           )}

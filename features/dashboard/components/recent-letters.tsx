@@ -1,5 +1,5 @@
 import React from "react";
-import { FilterStatus, Letter } from "../types";
+import { DashboardLetter, FilterStatus } from "../types";
 import {
   DownloadIcon,
   ChevronRightIcon,
@@ -9,11 +9,11 @@ import {
 } from "./icons";
 
 interface RecentLettersProps {
-  letters: Letter[];
+  letters: DashboardLetter[];
   currentFilter: FilterStatus;
   onFilterChange: (filter: FilterStatus) => void;
-  onSelectLetter: (letter: Letter) => void;
-  onDownloadPdf: (letter: Letter) => void;
+  onSelectLetter: (letter: DashboardLetter) => void;
+  onDownloadPdf: (letter: DashboardLetter) => void;
 }
 
 export function RecentLetters({
@@ -25,7 +25,7 @@ export function RecentLetters({
 }: RecentLettersProps) {
   const tabs: FilterStatus[] = ["Semua", "Berjalan", "Disetujui", "Revisi"];
 
-  const renderStatusBadge = (status: Letter["status"]) => {
+  const renderStatusBadge = (status: DashboardLetter["status"]) => {
     switch (status) {
       case "approved":
         return (
@@ -125,7 +125,7 @@ export function RecentLetters({
             ) : (
               letters.map((item) => (
                 <tr
-                  key={item.no}
+                  key={item.id}
                   className="transition-colors hover:bg-slate-50/80 group"
                 >
                   {/* Column 1: No & Perihal */}
@@ -163,7 +163,7 @@ export function RecentLetters({
                   {/* Column 6: Aksi */}
                   <td className="px-5 py-3.5 text-right">
                     <div className="inline-flex items-center gap-1.5">
-                      {item.downloadable && (
+                      {item.finalDocumentId && (
                         <button
                           type="button"
                           onClick={() => onDownloadPdf(item)}

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { StageStatus } from "../types";
 import {
   ChevronRightIcon,
   CopyIcon,
@@ -20,6 +21,9 @@ interface HeaderBannerProps {
   currentStageName: string;
   progressPercent: number;
   estimatedCompletion: string;
+  stageStatuses: StageStatus[];
+  canDownloadDocument: boolean;
+  downloading: boolean;
   onBackToDashboard?: () => void;
   onBackToLetters?: () => void;
   onDownloadDraft?: () => void;
@@ -35,6 +39,9 @@ export function HeaderBanner({
   currentStageName,
   progressPercent,
   estimatedCompletion,
+  stageStatuses,
+  canDownloadDocument,
+  downloading,
   onBackToDashboard,
   onBackToLetters,
   onDownloadDraft,
@@ -118,15 +125,22 @@ export function HeaderBanner({
               </div>
             </div>
 
-            {/* Action Button: Download Draft Copy */}
+            {/* Action Button: Download Final Document */}
             <div className="shrink-0">
               <button
                 type="button"
                 onClick={onDownloadDraft}
-                className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs lg:text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 active:scale-[0.99] transition cursor-pointer"
+                disabled={!canDownloadDocument || downloading}
+                className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-xs lg:text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-50 hover:border-slate-300 active:scale-[0.99] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <DownloadIcon size={16} className="text-slate-600" />
-                <span>Download Salinan Draf</span>
+                <span>
+                  {downloading
+                    ? "Mengunduh…"
+                    : canDownloadDocument
+                    ? "Unduh Dokumen Final (Ber-QR)"
+                    : "Dokumen final belum tersedia"}
+                </span>
               </button>
             </div>
           </div>
@@ -143,25 +157,25 @@ export function HeaderBanner({
               </span>
             </div>
 
-            {/* 8-segment progress track */}
+            {/* Dynamic progress track */}
             <div className="flex flex-1 items-center gap-1.5 max-w-md mx-2">
-              {/* Stages 1 to 8 visually encoded */}
-              {/* Stage 1: Approved */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#10b981]" title="Tahap 1: Disetujui" />
-              {/* Stage 2: Approved */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#10b981]" title="Tahap 2: Disetujui" />
-              {/* Stage 3: Approved */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#10b981]" title="Tahap 3: Disetujui" />
-              {/* Stage 4: Delegated */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#8b5cf6]" title="Tahap 4: Delegasi" />
-              {/* Stage 5: Approved */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#10b981]" title="Tahap 5: Disetujui" />
-              {/* Stage 6: Active */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#2563eb]/50" title="Tahap 6: Aktif" />
-              {/* Stage 7: Pending */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#cbd5e1]" title="Tahap 7: Pending" />
-              {/* Stage 8: Pending */}
-              <div className="h-1.5 flex-1 rounded-full bg-[#cbd5e1]" title="Tahap 8: Pending" />
+              {stageStatuses.map((status, index) => {
+                const color =
+                  status === "approved"
+                    ? "bg-[#10b981]"
+                    : status === "delegated"
+                    ? "bg-[#8b5cf6]"
+                    : status === "active"
+                    ? "bg-[#2563eb]/50"
+                    : "bg-[#cbd5e1]";
+                return (
+                  <div
+                    key={index}
+                    className={`h-1.5 flex-1 rounded-full ${color}`}
+                    title={`Tahap ${index + 1}: ${status}`}
+                  />
+                );
+              })}
             </div>
 
             {/* Percentage & Estimation */}

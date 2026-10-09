@@ -21,7 +21,7 @@ interface StaffSidebarProps {
 export function StaffSidebar({
   view,
   onChange,
-  pendingCount = 4,
+  pendingCount = 0,
 }: StaffSidebarProps) {
   const navItems = [
     { id: "dashboard" as NavView, label: "Dasbor", icon: DashboardIcon },

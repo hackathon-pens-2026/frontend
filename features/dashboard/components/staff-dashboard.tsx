@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import { StaffActivityItem, StaffProfile } from "../types";
 import {
   Avatar,
   Button,
@@ -16,85 +15,127 @@ import {
   AlertCircleIcon,
   ExternalDutyIcon,
 } from "@/components/ui";
+import type { BaseApprovalStatus } from "@/components/ui";
+import { useSession } from "@/lib/auth/session-provider";
+import {
+  formatDate,
+  letterStatusLabel,
+  letterStatusToBadge,
+} from "@/lib/display/letter";
+import type { LetterSummaryDto } from "@/lib/api/types";
 
 export interface PriorityItem {
   id: string;
+  number: string;
   title: string;
   applicant: string;
   unit: string;
   slaHours: number;
   slaTotal: number;
-  status: "approved" | "review" | "pending" | "rejected" | "delegated" | "waiting";
+  status: BaseApprovalStatus | string;
   priority?: boolean;
 }
 
 interface StaffDashboardProps {
-  profile: StaffProfile;
   priorityLetters: PriorityItem[];
-  activities: StaffActivityItem[];
+  pendingCount: number;
+  overdueCount: number;
+  myLetters: LetterSummaryDto[];
+  loading?: boolean;
   onGoToInbox: () => void;
   onGoToDelegation: () => void;
-  onOpenLetter: (id: string) => void;
+  onGoToSubmissions: () => void;
+  onOpenLetter: (letterId: string) => void;
+}
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 11) return "Selamat pagi";
+  if (hour < 15) return "Selamat siang";
+  if (hour < 19) return "Selamat sore";
+  return "Selamat malam";
 }
 
 export function StaffDashboard({
-  profile,
   priorityLetters,
-  activities,
+  pendingCount,
+  overdueCount,
+  myLetters,
+  loading = false,
   onGoToInbox,
   onGoToDelegation,
+  onGoToSubmissions,
   onOpenLetter,
 }: StaffDashboardProps) {
-  const pendingCount = priorityLetters.filter((l) => l.status === "pending").length;
+  const { user } = useSession();
+  const firstName = (user?.name ?? "").split(" ")[0];
+  const today = new Intl.DateTimeFormat("id-ID", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+
+  const completedCount = myLetters.filter((l) => l.status === "Completed").length;
+  const revisionCount = myLetters.filter((l) => l.status === "NeedsRevision").length;
 
   const metrics = [
     {
       label: "Menunggu Tanda Tangan",
       value: `${pendingCount}`,
-      delta: "2 mendesak",
+      delta: "tugas aktif di kotak persetujuan",
       icon: ClockIcon,
       tone: "text-amber-600 bg-pending-bg",
     },
     {
-      label: "Disetujui Bulan Ini",
-      value: "128",
-      delta: "+18% vs Mei",
+      label: "Melewati SLA",
+      value: `${overdueCount}`,
+      delta: overdueCount > 0 ? "perlu tindakan segera" : "semua dalam batas waktu",
+      icon: AlertCircleIcon,
+      tone: "text-red-500 bg-reject-bg",
+    },
+    {
+      label: "Pengajuan Selesai",
+      value: `${completedCount}`,
+      delta: "dari pengajuan Anda",
       icon: CheckIcon,
       tone: "text-emerald-600 bg-ok-bg",
     },
     {
-      label: "Rata-rata Waktu Proses",
-      value: "6,4j",
-      delta: "−2,1j lebih cepat",
+      label: "Perlu Revisi",
+      value: `${revisionCount}`,
+      delta: "dari pengajuan Anda",
       icon: ClockIcon,
       tone: "text-review bg-review-bg",
-    },
-    {
-      label: "Perlu Revisi",
-      value: "3",
-      delta: "dari pengajuan Anda",
-      icon: AlertCircleIcon,
-      tone: "text-red-500 bg-reject-bg",
     },
   ];
 
   return (
     <div className="animate-rise space-y-8">
-      {/* Welcome Banner */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="text-micro font-medium tracking-wide text-slate-500 uppercase">
-            Rabu, 18 Juni 2025
+            {today}
           </p>
           <h1 className="mt-1 text-display font-bold text-midnight">
-            Selamat pagi, {profile.short.split(" ")[0]}
+            {greeting()}
+            {firstName ? `, ${firstName}` : ""}
           </h1>
           <p className="mt-1 text-body text-slate-500">
-            Ada{" "}
-            <span className="font-semibold text-midnight">
-              {pendingCount} dokumen
-            </span>{" "}
-            menunggu tanda tangan Anda — 1 di antaranya mendekati batas SLA.
+            {loading ? (
+              "Memuat data dari server…"
+            ) : (
+              <>
+                Ada{" "}
+                <span className="font-semibold text-midnight">
+                  {pendingCount} dokumen
+                </span>{" "}
+                menunggu tanda tangan Anda
+                {overdueCount > 0
+                  ? ` — ${overdueCount} di antaranya melewati batas SLA.`
+                  : "."}
+              </>
+            )}
           </p>
         </div>
         <Button variant="gold" onClick={onGoToInbox}>
@@ -103,7 +144,6 @@ export function StaffDashboard({
         </Button>
       </div>
 
-      {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {metrics.map((m) => {
           const Icon = m.icon;
@@ -130,9 +170,7 @@ export function StaffDashboard({
         })}
       </div>
 
-      {/* Main Grid: Priority Inbox, Activities & External Duty Banner */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Priority Today */}
         <Card className="lg:col-span-12 p-6">
           <CardHeader
             title="Prioritas Hari Ini"
@@ -147,7 +185,11 @@ export function StaffDashboard({
             }
           />
           <div className="mt-4 divide-y divide-line">
-            {priorityLetters.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center text-body text-slate-500">
+                Memuat tugas dari server…
+              </div>
+            ) : priorityLetters.length === 0 ? (
               <div className="py-8 text-center text-body text-slate-500">
                 Semua surat prioritas telah ditindaklanjuti.
               </div>
@@ -158,7 +200,7 @@ export function StaffDashboard({
                   onClick={() => onOpenLetter(item.id)}
                   className="group flex w-full items-center gap-4 py-4 text-left first:pt-2 last:pb-0 cursor-pointer"
                 >
-                  <Avatar name={item.applicant} size={40} />
+                  <Avatar name={item.applicant || "Pemohon"} size={40} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-body font-semibold text-midnight group-hover:text-navy">
@@ -166,13 +208,14 @@ export function StaffDashboard({
                       </span>
                       {item.priority && (
                         <span className="rounded-full bg-midnight px-2 py-px text-[10px] font-bold tracking-wider text-gold uppercase">
-                          Mendesak
+                          Lewat SLA
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-micro text-slate-500">
-                      {item.applicant} · {item.unit} ·{" "}
-                      <span className="tabular-nums">{item.id}</span>
+                    <div className="mt-0.5 truncate text-micro text-slate-500">
+                      {item.applicant}
+                      {item.unit ? ` · ${item.unit}` : ""} ·{" "}
+                      <span className="tabular-nums">{item.number}</span>
                     </div>
                   </div>
                   <SlaBadge hours={item.slaHours} total={item.slaTotal} />
@@ -185,30 +228,43 @@ export function StaffDashboard({
           </div>
         </Card>
 
-        {/* Activity Feed */}
         <Card className="lg:col-span-8 p-6">
-          <CardHeader title="Aktivitas Terkini" />
-          <ol className="relative mt-5 space-y-5 before:absolute before:top-2 before:bottom-2 before:left-[15px] before:w-px before:bg-line">
-            {activities.map((act, i) => (
-              <li key={i} className="relative flex items-center gap-4">
-                <span className="relative z-10 flex size-8 items-center justify-center rounded-full bg-white ring-1 ring-line">
-                  <Avatar name={act.who} size={26} />
-                </span>
-                <div className="flex-1 text-body text-slate-600">
-                  <span className="font-semibold text-midnight">{act.who}</span>{" "}
-                  {act.what}{" "}
-                  <span className="font-medium text-midnight">{act.doc}</span>
+          <CardHeader
+            title="Pengajuan Saya"
+            action={
+              <button
+                onClick={onGoToSubmissions}
+                className="flex items-center gap-1 text-body font-semibold text-navy hover:underline cursor-pointer"
+              >
+                <span>Semua pengajuan</span>
+                <ChevronRightIcon className="size-4" />
+              </button>
+            }
+          />
+          <div className="mt-4 divide-y divide-line">
+            {myLetters.length === 0 ? (
+              <div className="py-8 text-center text-body text-slate-500">
+                Belum ada pengajuan atas nama Anda.
+              </div>
+            ) : (
+              myLetters.slice(0, 5).map((letter) => (
+                <div key={letter.id} className="flex items-center gap-4 py-3.5">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-body font-semibold text-midnight">
+                      {letter.title}
+                    </div>
+                    <div className="mt-0.5 text-micro text-slate-500">
+                      {letter.number} · {formatDate(letter.submittedAt)} ·{" "}
+                      {letterStatusLabel(letter.status)}
+                    </div>
+                  </div>
+                  <StatusBadge status={letterStatusToBadge(letter.status)} />
                 </div>
-                <StatusBadge status={act.status} />
-                <span className="w-14 text-right text-micro text-slate-400">
-                  {act.when}
-                </span>
-              </li>
-            ))}
-          </ol>
+              ))
+            )}
+          </div>
         </Card>
 
-        {/* External Duty Banner */}
         <div className="lg:col-span-4 overflow-hidden rounded-xl bg-midnight p-6 text-white shadow-lift flex flex-col justify-between">
           <div>
             <div className="flex size-10 items-center justify-center rounded-lg bg-delegate/20 text-violet-300">
@@ -218,7 +274,8 @@ export function StaffDashboard({
               Dinas luar minggu depan?
             </h3>
             <p className="mt-1 text-body text-slate-400">
-              Delegasikan wewenang tanda tangan ke Sekretaris Departemen agar alur birokrasi tidak terhenti.
+              Delegasikan wewenang tanda tangan per tugas dari kotak persetujuan
+              agar alur birokrasi tidak terhenti.
             </p>
           </div>
           <Button
@@ -226,7 +283,7 @@ export function StaffDashboard({
             className="mt-5 w-full"
             onClick={onGoToDelegation}
           >
-            Atur Delegasi
+            Pelajari Delegasi
           </Button>
         </div>
       </div>

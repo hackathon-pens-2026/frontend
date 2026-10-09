@@ -1,37 +1,21 @@
-export type LetterStatus = "review" | "approved" | "rejected" | "pending";
+export type DashboardLetterStatus = "review" | "approved" | "rejected" | "pending";
 
-export type ApprovalStepStatus = LetterStatus | "waiting" | "delegated";
-
-export interface ApprovalStep {
-  role: string;
-  name: string;
-  status: ApprovalStepStatus;
-  at?: string;
-  note?: string;
-  hash?: string;
-  delegate?: {
-    to: string;
-    reason: string;
-  };
-}
-
-export interface Letter {
+export interface DashboardLetter {
+  id: string;
   no: string;
   title: string;
   category: string;
   date: string;
   stage: string;
-  status: LetterStatus;
-  downloadable?: boolean;
-  steps: ApprovalStep[];
-}
-
-export interface UserProfile {
-  name: string;
-  nrp: string;
-  prodi: string;
-  initials: string;
-  isSsoVerified: boolean;
+  status: DashboardLetterStatus;
+  completedTasks: number;
+  totalTasks: number;
+  finalDocumentId: string | null;
+  dueAt: string | null;
+  isOverdue: boolean;
+  version: string;
+  revisionId: string;
+  contentHash: string;
 }
 
 export interface SummaryMetric {
@@ -53,27 +37,3 @@ export interface NavigationItem {
   label: string;
   badge?: number;
 }
-
-export interface StaffProfile {
-  name: string;
-  short: string;
-  role: string;
-  nip: string;
-  initials: string;
-}
-
-export interface StaffDashboardMetric {
-  label: string;
-  value: string;
-  delta: string;
-  tone: string;
-}
-
-export interface StaffActivityItem {
-  who: string;
-  what: string;
-  doc: string;
-  when: string;
-  status: "approved" | "review" | "pending" | "rejected" | "delegated" | "waiting";
-}
-

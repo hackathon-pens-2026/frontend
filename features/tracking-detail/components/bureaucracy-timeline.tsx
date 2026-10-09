@@ -8,27 +8,17 @@ import {
   ChevronRightIcon,
   ClockIcon,
   ShieldCheckIcon,
-  SendIcon,
   InfoIcon,
   ArrowRightIcon,
 } from "./icons";
 
 interface BureaucracyTimelineProps {
   stages: TimelineStage[];
-  onSendReminder?: () => void;
-  isReminderSent?: boolean;
 }
 
-export function BureaucracyTimeline({
-  stages,
-  onSendReminder,
-  isReminderSent = false,
-}: BureaucracyTimelineProps) {
+export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
   // Keep track of which stages have open accordion details
-  const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({
-    1: true,
-    4: true,
-  });
+  const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
 
   const [showEscalationInfo, setShowEscalationInfo] = useState(false);
 
@@ -165,7 +155,7 @@ export function BureaucracyTimeline({
                           <span className="text-slate-400">·</span>
                           <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700">
                             <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Terakhir aktif 42 mnt lalu
+                            {stage.lastActive ?? "Menunggu respons"}
                           </span>
                         </div>
                       </div>
@@ -184,48 +174,30 @@ export function BureaucracyTimeline({
                           <ClockIcon size={14} className="text-amber-600" />
                           <span>Sisa Waktu Respons:</span>
                           <span className="font-mono font-bold text-amber-900">
-                            18 Jam 41 Menit <span className="opacity-70">54d</span>
+                            {stage.slaRemaining ?? "-"}
                           </span>
                         </div>
 
                         <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                          <span>Mulai 09 Okt, 11:00</span>
+                          <span>Mulai {stage.slaStartTime ?? "-"}</span>
                           <span>·</span>
-                          <span className="font-medium text-slate-700">Batas 10 Okt, 11:00</span>
+                          <span className="font-medium text-slate-700">
+                            Batas {stage.slaDeadline ?? "-"}
+                          </span>
                         </div>
                       </div>
 
-                      {/* Visual Gradient Progress Bar for SLA */}
+                      {/* Visual gradient progress bar for SLA */}
                       <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                        <div className="h-full w-1/4 rounded-full bg-gradient-to-r from-blue-600 to-amber-500" />
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-blue-600 to-amber-500"
+                          style={{ width: `${stage.slaPercent ?? 25}%` }}
+                        />
                       </div>
                     </div>
 
-                    {/* Action Buttons: Auto-reminder & Escalation info */}
+                    {/* Escalation info */}
                     <div className="flex flex-wrap items-center gap-3 pt-1">
-                      <button
-                        type="button"
-                        onClick={onSendReminder}
-                        disabled={isReminderSent}
-                        className={`inline-flex h-11 items-center gap-2 rounded-lg px-4 text-xs font-semibold shadow-xs transition cursor-pointer ${
-                          isReminderSent
-                            ? "bg-emerald-600 text-white cursor-default"
-                            : "bg-[#1e3a8a] text-white hover:bg-[#172554] active:scale-[0.99]"
-                        }`}
-                      >
-                        {isReminderSent ? (
-                          <>
-                            <CheckIcon size={16} />
-                            <span>Auto-Reminder Terkirim (WhatsApp &amp; SSO)</span>
-                          </>
-                        ) : (
-                          <>
-                            <SendIcon size={15} />
-                            <span>Kirimkan Auto-Reminder (WhatsApp &amp; Email SSO)</span>
-                          </>
-                        )}
-                      </button>
-
                       <button
                         type="button"
                         onClick={() => setShowEscalationInfo((prev) => !prev)}
@@ -235,6 +207,9 @@ export function BureaucracyTimeline({
                       >
                         <InfoIcon size={18} />
                       </button>
+                      <span className="text-[11px] text-slate-500">
+                        Pengingat dikirim otomatis oleh backend sesuai jadwal SLA.
+                      </span>
                     </div>
                   </div>
                 ) : (

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from "@/lib/auth/session-provider";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -10,8 +12,8 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SignIt! — Student Portal",
-  description: "Pantau kelancaran birokrasi dan status surat izinmu secara real-time.",
+  title: "SignIt! — Portal Surat Kampus",
+  description: "Ajukan, tanda tangani, dan pantau surat kampus dalam satu alur.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -20,7 +22,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="id"
       className={`${plusJakartaSans.variable} h-full antialiased bg-[#f8fafc]`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-[#f8fafc] text-[#0f172a]">{children}</body>
+      <body className="min-h-full flex flex-col font-sans bg-[#f8fafc] text-[#0f172a]">
+        <Suspense fallback={null}>
+          <SessionProvider>{children}</SessionProvider>
+        </Suspense>
+      </body>
     </html>
   );
 }

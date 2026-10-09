@@ -94,9 +94,11 @@ export function DocumentSummaryCard({
               Lampiran
             </span>
             <div className="text-xs font-semibold text-slate-900 leading-snug">
-              {summary.attachments.join(", ")}
+              {summary.attachments.length > 0
+                ? summary.attachments.join(", ")
+                : "Tidak ada lampiran yang disimpan di sistem."}
             </div>
-            {onPreviewAttachment && (
+            {onPreviewAttachment && summary.attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1.5">
                 {summary.attachments.map((file) => (
                   <button

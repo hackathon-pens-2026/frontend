@@ -23,6 +23,7 @@ export interface TimelineStage {
   delegation?: DelegationInfo;
   isExpanded?: boolean;
   slaRemaining?: string;
+  slaPercent?: number;
   slaStartTime?: string;
   slaDeadline?: string;
   lastActive?: string;

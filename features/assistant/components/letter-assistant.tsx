@@ -13,6 +13,7 @@ import {
   registeredPembinaList,
   typePillOptions,
 } from "../data/initial-data";
+import { StudentSidebar } from "@/features/shell";
 import { AssistantHeader } from "./assistant-header";
 import { ChatPane } from "./chat-pane";
 import { DraftSummary } from "./draft-summary";
@@ -28,16 +29,20 @@ export function LetterAssistant() {
       from: "bot",
       text: "Halo! Ingin membuat tipe surat apa hari ini?",
       widget: "typePills",
+      timestamp: "14:15",
     },
     {
       id: 2,
       from: "bot",
       text: "Baik, untuk Peminjaman Ruangan saya memerlukan beberapa data: nama kegiatan, tanggal, estimasi peserta, dan ruangan yang dituju.",
+      timestamp: "14:16",
     },
     {
       id: 3,
       from: "user",
       text: "Nama Kegiatan: Buka Bersama & Diskusi Himpunan; Tanggal: 18 Oktober 2026; Ruang: Teater D4.",
+      timestamp: "14:17",
+      status: "delivered",
     },
     {
       id: 4,
@@ -51,6 +56,7 @@ export function LetterAssistant() {
         </>
       ),
       widget: "ketuaPicker",
+      timestamp: "14:18",
     },
   ]);
 
@@ -65,13 +71,15 @@ export function LetterAssistant() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isFirstRender = useRef(true);
 
+  const getCurrentTimeString = () => {
+    return new Date().toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   useEffect(() => {
-    setFormattedTime(
-      new Date().toLocaleTimeString("id-ID", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    );
+    setFormattedTime(getCurrentTimeString());
   }, []);
 
   // Auto-save trigger on fields update
@@ -84,12 +92,7 @@ export function LetterAssistant() {
     setIsDraftGenerated(false);
     const timer = setTimeout(() => {
       setIsSaving(false);
-      setFormattedTime(
-        new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
+      setFormattedTime(getCurrentTimeString());
     }, 700);
     return () => clearTimeout(timer);
   }, [fields]);
@@ -108,9 +111,10 @@ export function LetterAssistant() {
     setIsThinking(true);
     setTimeout(() => {
       setIsThinking(false);
+      const nowTime = getCurrentTimeString();
       setMessages((prev) => [
         ...prev,
-        { id: getNextId(), from: "bot", text, widget },
+        { id: getNextId(), from: "bot", text, widget, timestamp: nowTime },
       ]);
     }, delay);
   };
@@ -118,7 +122,7 @@ export function LetterAssistant() {
   const checkNextMissingField = (remaining: LetterFormField[]) => {
     if (!remaining.length) {
       return askBot(
-        'Semua field wajib sudah lengkap. Tekan "Generate Draf Surat" di panel kanan untuk menyusun draf dokumen resmi.'
+        'Semua field wajib sudah lengkap. Tekan tombol "Generate Draf Surat (PDF)" di panel kanan untuk menyusun dokumen resmi.'
       );
     }
     const nextField = remaining[0];
@@ -149,12 +153,15 @@ export function LetterAssistant() {
   const handleSelectKetua = (person: PersonOption) => {
     if (getFieldValue("ketua") !== person.name) {
       updateFieldValue("ketua", person.name);
+      const nowTime = getCurrentTimeString();
       setMessages((prev) => [
         ...prev,
         {
           id: getNextId(),
           from: "user",
           text: `Ketua Pelaksana: ${person.name}`,
+          timestamp: nowTime,
+          status: "delivered",
         },
       ]);
       askBot(`${person.name} ditetapkan sebagai Ketua Pelaksana.`);
@@ -167,12 +174,15 @@ export function LetterAssistant() {
   const handleSelectPembina = (person: PersonOption) => {
     const prev = getFieldValue("pembina");
     updateFieldValue("pembina", person.name);
+    const nowTime = getCurrentTimeString();
     setMessages((prev) => [
       ...prev,
       {
         id: getNextId(),
         from: "user",
         text: `Dosen Pembina: ${person.name}`,
+        timestamp: nowTime,
+        status: "delivered",
       },
     ]);
     if (prev) {
@@ -190,6 +200,7 @@ export function LetterAssistant() {
         : `${Math.max(1, Math.round(file.size / 1024))} KB`;
 
     updateFieldValue("rundown", `${file.name} · ${formattedSize}`);
+    const nowTime = getCurrentTimeString();
     setMessages((prev) => [
       ...prev,
       {
@@ -200,6 +211,8 @@ export function LetterAssistant() {
             📄 {file.name} ({formattedSize})
           </span>
         ),
+        timestamp: nowTime,
+        status: "delivered",
       },
     ]);
     checkNextMissingField(getMissingExcluding("rundown"));
@@ -210,9 +223,16 @@ export function LetterAssistant() {
     if (!raw || isThinking) return;
 
     setInputVal("");
+    const nowTime = getCurrentTimeString();
     setMessages((prev) => [
       ...prev,
-      { id: getNextId(), from: "user", text: raw },
+      {
+        id: getNextId(),
+        from: "user",
+        text: raw,
+        timestamp: nowTime,
+        status: "delivered",
+      },
     ]);
 
     const lower = raw.toLowerCase();
@@ -320,13 +340,15 @@ export function LetterAssistant() {
     setTimeout(() => {
       setIsDrafting(false);
       setIsDraftGenerated(true);
+      const nowTime = getCurrentTimeString();
       setMessages((prev) => [
         ...prev,
         {
           id: getNextId(),
           from: "bot",
-          text: 'Draf surat berhasil dibuat dengan format resmi PENS. Tinjau pratinjaunya, lalu tekan "Ajukan Surat" di panel kanan bila sudah sesuai.',
+          text: 'Draf surat berhasil dibuat dengan format resmi PENS. Tinjau pratinjaunya, lalu tekan tombol "Ajukan Surat Sekarang" di panel kanan bila sudah sesuai.',
           widget: "pdf",
+          timestamp: nowTime,
         },
       ]);
     }, 1400);
@@ -342,7 +364,7 @@ export function LetterAssistant() {
   }, [fields]);
 
   return (
-    <div className="flex h-screen min-w-[1024px] flex-col bg-canvas text-midnight">
+    <div className="flex h-screen min-w-[1240px] bg-canvas text-midnight selection:bg-blue-100">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -352,56 +374,55 @@ export function LetterAssistant() {
         onChange={(e) => handleFileUpload(e.target.files?.[0])}
       />
 
-      {/* Top Header */}
-      <AssistantHeader
-        isSaving={isSaving}
-        lastSavedTime={formattedTime}
-        userName="M. Fajrul"
-      />
+      {/* Student Shell Sidebar (Requested by User) */}
+      <StudentSidebar currentPath="/surat/baru" />
 
-      {/* Main 2-Column Grid Workspace */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(480px,3fr)_minmax(340px,2fr)] gap-6 p-6 lg:p-8 overflow-hidden">
-        {/* Left Chat Pane */}
-        <ChatPane
-          messages={messages}
-          isThinking={isThinking}
-          inputValue={inputVal}
-          onInputChange={setInputVal}
-          onSendMessage={handleSendMessage}
-          suggestions={dynamicSuggestions}
-          registeredKetua={registeredKetuaList}
-          registeredPembina={registeredPembinaList}
-          selectedKetua={getFieldValue("ketua")}
-          selectedPembina={getFieldValue("pembina")}
-          onSelectKetua={handleSelectKetua}
-          onSelectPembina={handleSelectPembina}
-          rundownValue={getFieldValue("rundown")}
-          onOpenFilePicker={() => fileInputRef.current?.click()}
-          typePillOptions={typePillOptions}
-          selectedType={getFieldValue("jenis")}
-          onSelectType={(t) => updateFieldValue("jenis", t)}
-          onPreviewPdf={() => {}}
+      {/* Main Assistant Workspace */}
+      <div className="flex min-w-0 flex-1 flex-col pl-[260px] overflow-hidden">
+        {/* Top Header */}
+        <AssistantHeader
+          isSaving={isSaving}
+          lastSavedTime={formattedTime}
+          userName="M. Fajrul"
         />
 
-        {/* Right Data Summary & Action Pane */}
-        <DraftSummary
-          fields={fields}
-          onUpdateField={updateFieldValue}
-          onEditFieldRequest={handleEditFieldRequest}
-          isDraftGenerated={isDraftGenerated}
-          isDrafting={isDrafting}
-          onGenerateDraft={handleGenerateDraft}
-          isSubmitted={isSubmitted}
-          onSubmitLetter={() => setIsSubmitted(true)}
-          onSaveAsDraft={() =>
-            setFormattedTime(
-              new Date().toLocaleTimeString("id-ID", {
-                hour: "2-digit",
-                minute: "2-digit",
-              })
-            )
-          }
-        />
+        {/* 2-Column Grid Workspace */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(480px,3fr)_minmax(360px,2fr)] gap-6 p-6 lg:p-7 overflow-hidden">
+          {/* Left Chat Pane */}
+          <ChatPane
+            messages={messages}
+            isThinking={isThinking}
+            inputValue={inputVal}
+            onInputChange={setInputVal}
+            onSendMessage={handleSendMessage}
+            suggestions={dynamicSuggestions}
+            registeredKetua={registeredKetuaList}
+            registeredPembina={registeredPembinaList}
+            selectedKetua={getFieldValue("ketua")}
+            selectedPembina={getFieldValue("pembina")}
+            onSelectKetua={handleSelectKetua}
+            onSelectPembina={handleSelectPembina}
+            rundownValue={getFieldValue("rundown")}
+            onOpenFilePicker={() => fileInputRef.current?.click()}
+            typePillOptions={typePillOptions}
+            selectedType={getFieldValue("jenis")}
+            onSelectType={(t) => updateFieldValue("jenis", t)}
+            onPreviewPdf={() => {}}
+          />
+
+          {/* Right Data Summary & Action Pane */}
+          <DraftSummary
+            fields={fields}
+            onUpdateField={updateFieldValue}
+            onEditFieldRequest={handleEditFieldRequest}
+            isDraftGenerated={isDraftGenerated}
+            isDrafting={isDrafting}
+            onGenerateDraft={handleGenerateDraft}
+            isSubmitted={isSubmitted}
+            onSubmitLetter={() => setIsSubmitted(true)}
+            onSaveAsDraft={() => setFormattedTime(getCurrentTimeString())}
+          />
+        </div>
       </div>
     </div>
   );

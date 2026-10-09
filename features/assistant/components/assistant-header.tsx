@@ -25,31 +25,22 @@ export function AssistantHeader({
 }: AssistantHeaderProps) {
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b border-line bg-white px-8">
-      {/* Brand */}
-      <Link
-        href="/"
-        className="flex items-center gap-2 group cursor-pointer"
-        aria-label="SignIt! Beranda Mahasiswa"
-      >
-        <span className="flex size-8 items-center justify-center rounded-lg bg-midnight text-white shadow-lift">
-          <PenToolIcon className="size-4" strokeWidth={2.4} />
-        </span>
-        <span className="text-body font-extrabold text-midnight">
-          SignIt<span className="text-gold">!</span>
-        </span>
-      </Link>
-
-      <span className="h-5 w-px bg-line" />
-
-      {/* Breadcrumb */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-body">
+      {/* Breadcrumb Navigation */}
+      <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-body">
         <Link
           href="/"
           className="font-medium text-slate-500 hover:text-navy transition-colors"
         >
+          Beranda
+        </Link>
+        <ChevronRightIcon className="size-3.5 text-slate-300" />
+        <Link
+          href="/#my-letters"
+          className="font-medium text-slate-500 hover:text-navy transition-colors"
+        >
           Surat Saya
         </Link>
-        <ChevronRightIcon className="size-4 text-slate-300" />
+        <ChevronRightIcon className="size-3.5 text-slate-300" />
         <span className="font-semibold text-midnight">
           Buat Surat Baru (Asisten AI)
         </span>

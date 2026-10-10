@@ -38,8 +38,15 @@ export async function toApiError(response: Response): Promise<ApiError> {
     problem = null;
   }
   const code = problem?.code ?? FALLBACK_CODES[response.status] ?? "request_failed";
-  const message =
-    problem?.title ?? "Permintaan tidak dapat diproses. Coba kembali.";
+  let message =
+    problem?.title ?? problem?.detail ?? "Permintaan tidak dapat diproses. Coba kembali.";
+  if (
+    response.status === 401 ||
+    message.toLowerCase().includes("login kembali") ||
+    message.toLowerCase().includes("masuk kembali")
+  ) {
+    message = "";
+  }
   return new ApiError(response.status, code, message, problem);
 }
 

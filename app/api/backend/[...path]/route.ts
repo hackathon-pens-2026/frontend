@@ -14,7 +14,6 @@ async function forward(request: NextRequest, context: Context) {
   const logout = path.join("/") === "auth/logout";
   if (path[0] === "auth" && !login && !logout) return NextResponse.json({ detail: "Endpoint tidak tersedia." }, { status: 404 });
   const token = request.cookies.get("signit-access")?.value;
-  if (!login && !token) return NextResponse.json({ detail: "Silakan masuk kembali." }, { status: 401 });
   const base = process.env.BACKEND_URL ?? process.env.NEXT_PUBLIC_API_URL;
   if (!base) return NextResponse.json({ detail: "BACKEND_URL belum dikonfigurasi pada frontend." }, { status: 503 });
   const headers = new Headers();

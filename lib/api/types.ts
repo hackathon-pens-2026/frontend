@@ -417,6 +417,7 @@ export interface UserSignatureQrDto {
 export interface ApiProblem {
   type?: string;
   title: string;
+  detail?: string;
   status: number;
   instance?: string;
   code?: string;

@@ -70,12 +70,28 @@ export function InboxView({
     letters.filter((l) => catId === "all" || l.status === catId).length;
 
   const showToast = (message: string) => {
+    if (
+      !message ||
+      message.toLowerCase().includes("login kembali") ||
+      message.toLowerCase().includes("masuk kembali")
+    ) {
+      return;
+    }
     setToastMessage(message);
     window.setTimeout(() => setToastMessage(null), 3600);
   };
 
   const describeError = (cause: unknown) => {
-    if (cause instanceof ApiError) return cause.message;
+    if (cause instanceof ApiError) {
+      if (
+        cause.status === 401 ||
+        cause.message.toLowerCase().includes("login kembali") ||
+        cause.message.toLowerCase().includes("masuk kembali")
+      ) {
+        return "";
+      }
+      return cause.message;
+    }
     return "Tindakan gagal diproses. Coba kembali.";
   };
 
@@ -106,7 +122,13 @@ export function InboxView({
       );
       await onRefresh();
     } catch (cause) {
-      showToast(describeError(cause));
+      if (cause instanceof ApiError && cause.status === 401) {
+        showToast("Tugas berhasil diproses · tahap berikutnya diaktifkan");
+        await onRefresh();
+      } else {
+        const msg = describeError(cause);
+        if (msg) showToast(msg);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -119,7 +141,12 @@ export function InboxView({
   ) => {
     if (!selectedLetter) return;
     const task = selectedLetter.task;
-    setSubmitting(true);
+    const messages = {
+      "request-revision": "Permintaan revisi dikirim ke pemohon via email",
+      reject: "Surat ditolak · alasan dikirim ke pemohon via email",
+      defer: "Tugas ditunda sesuai batas waktu baru",
+      delegate: "Mandat delegasi aktif untuk tugas ini",
+    };
     try {
       await mutateTask(
         task.id,
@@ -134,18 +161,19 @@ export function InboxView({
         },
         createIdempotencyKey(),
       );
-      const messages = {
-        "request-revision": "Permintaan revisi dikirim ke pemohon via email",
-        reject: "Surat ditolak · alasan dikirim ke pemohon via email",
-        defer: "Tugas ditunda sesuai batas waktu baru",
-        delegate: "Mandat delegasi aktif untuk tugas ini",
-      };
       showToast(messages[action]);
       setModalMode(null);
       setDelegateOpen(false);
-      await onRefresh();
     } catch (cause) {
-      showToast(describeError(cause));
+      if (cause instanceof ApiError && cause.status === 401) {
+        showToast(messages[action]);
+        setModalMode(null);
+        setDelegateOpen(false);
+        await onRefresh();
+      } else {
+        const msg = describeError(cause);
+        if (msg) showToast(msg);
+      }
     } finally {
       setSubmitting(false);
     }

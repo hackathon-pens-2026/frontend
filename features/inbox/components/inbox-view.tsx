@@ -40,7 +40,7 @@ interface InboxViewProps {
 const filterTabs = [
   { id: "all", label: "Semua" },
   { id: "pending", label: "Menunggu Aksi" },
-  { id: "review", label: "Ditinjau" },
+  { id: "approved", label: "Disetujui" },
   { id: "delegated", label: "Didelegasikan" },
 ];
 
@@ -65,7 +65,15 @@ export function InboxView({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const filteredLetters = useMemo(
-    () => letters.filter((item) => filter === "all" || item.status === filter),
+    () =>
+      letters.filter((item) => {
+        if (filter === "all") return true;
+        if (filter === "pending") return item.status === "pending";
+        if (filter === "approved") return item.status === "approved";
+        if (filter === "delegated") return item.status === "delegated";
+        if (filter === "review") return item.status === "review" || item.status === "waiting";
+        return item.status === filter;
+      }),
     [letters, filter],
   );
 
@@ -80,7 +88,14 @@ export function InboxView({
     letters[0];
 
   const getFilterCount = (catId: string) =>
-    letters.filter((l) => catId === "all" || l.status === catId).length;
+    letters.filter((l) => {
+      if (catId === "all") return true;
+      if (catId === "pending") return l.status === "pending";
+      if (catId === "approved") return l.status === "approved";
+      if (catId === "delegated") return l.status === "delegated";
+      if (catId === "review") return l.status === "review" || l.status === "waiting";
+      return l.status === catId;
+    }).length;
 
   const showToast = (message: string) => {
     if (

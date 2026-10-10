@@ -45,7 +45,7 @@ function toDrawerStep(task: WorkflowTaskDto): DrawerStep {
 }
 
 export default function StudentDashboard() {
-  const { user, status: sessionStatus } = useSession();
+  const { user, status: sessionStatus, currentPersonaId } = useSession();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [tasks, setTasks] = useState<WorkflowTaskDto[]>([]);
   const [taskTotal, setTaskTotal] = useState(0);
@@ -113,7 +113,7 @@ export default function StudentDashboard() {
     return () => {
       active = false;
     };
-  }, [reloadKey, user?.id, sessionStatus]);
+  }, [reloadKey, user?.id, currentPersonaId, sessionStatus]);
 
   const retryLoadLetters = () => {
     setLoading(true);

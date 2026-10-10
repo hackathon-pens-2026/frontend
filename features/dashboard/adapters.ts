@@ -27,7 +27,7 @@ export function toDashboardLetter(letter: LetterSummaryDto): DashboardLetter {
     status: statusMap[letter.status],
     completedTasks: letter.completedTasks,
     totalTasks: letter.totalTasks,
-    finalDocumentId: null,
+    finalDocumentId: letter.status === "Completed" ? letter.id : null,
     dueAt: letter.activeTask?.dueAt ?? null,
     isOverdue: letter.activeTask?.isOverdue ?? false,
     version: letter.version,

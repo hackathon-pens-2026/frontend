@@ -319,6 +319,7 @@ export interface TemplateFieldDto {
   required: boolean;
   group: string;
   valueSource: TemplateValueSource;
+  defaultValue?: string;
 }
 
 export interface LetterTemplateDto {

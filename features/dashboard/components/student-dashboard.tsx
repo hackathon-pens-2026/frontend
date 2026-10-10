@@ -44,7 +44,7 @@ function toDrawerStep(task: WorkflowTaskDto): DrawerStep {
 }
 
 export default function StudentDashboard() {
-  const { user } = useSession();
+  const { user, status: sessionStatus } = useSession();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +71,11 @@ export default function StudentDashboard() {
   };
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated" || !user?.id) return;
     let active = true;
+    Promise.resolve().then(() => {
+      if (active) { setLoading(true); setDataAvailable(false); setLetters([]); }
+    });
     listMyLetters(1, 50)
       .then((result) => {
         if (!active) return;
@@ -88,7 +92,7 @@ export default function StudentDashboard() {
           return;
         }
         setError(
-          cause instanceof ApiError
+          cause instanceof Error
             ? cause.message
             : "Daftar surat tidak dapat dimuat.",
         );
@@ -99,7 +103,7 @@ export default function StudentDashboard() {
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, user?.id, sessionStatus]);
 
   const retryLoadLetters = () => {
     setLoading(true);

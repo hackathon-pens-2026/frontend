@@ -18,7 +18,7 @@ import type { LetterSummaryDto, WorkflowTaskDto } from "@/lib/api/types";
 
 export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }) {
   const router = useRouter();
-  const { uiSurface, userCategory, activePosition, currentPersonaId } = useSession();
+  const { uiSurface, userCategory, activePosition, currentPersonaId, user, status: sessionStatus } = useSession();
   const isStudent =
     studentInbox ||
     uiSurface === "Student" ||
@@ -31,6 +31,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
   const [tasksError, setTasksError] = useState<string | null>(null);
   const [letters, setLetters] = useState<LetterSummaryDto[]>([]);
   const [lettersLoading, setLettersLoading] = useState(true);
+  const [lettersError, setLettersError] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
   const [steps, setSteps] = useState<ApprovalStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -38,6 +39,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated" || !user?.id) return;
     let active = true;
     Promise.resolve().then(() => {
       if (active) setTasksLoading(true);
@@ -71,16 +73,23 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
     return () => {
       active = false;
     };
-  }, [refreshKey, activePosition?.positionCode, currentPersonaId]);
+  }, [refreshKey, activePosition?.positionCode, currentPersonaId, user?.id, sessionStatus]);
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated" || !user?.id) return;
     let active = true;
+    Promise.resolve().then(() => {
+      if (active) { setLettersLoading(true); setLetters([]); }
+    });
     listMyLetters(1, 50)
       .then((result) => {
-        if (active) setLetters(result.items);
+        if (active) { setLetters(result.items); setLettersError(null); }
       })
-      .catch(() => {
-        if (active) setLetters([]);
+      .catch((cause: unknown) => {
+        if (active) {
+          setLetters([]);
+          setLettersError(cause instanceof Error ? cause.message : "Daftar pengajuan belum dapat dimuat.");
+        }
       })
       .finally(() => {
         if (active) setLettersLoading(false);
@@ -88,7 +97,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, user?.id, sessionStatus]);
 
   const refresh = useCallback(async () => {
     setRefreshKey((key) => key + 1);
@@ -162,6 +171,12 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
 
       <div className="min-w-0 md:pl-[260px]">
         <main className="mx-auto w-full max-w-[1600px] px-4 pb-8 pt-16 md:px-6 md:pt-6 lg:px-8 xl:px-10">
+          {((view === "dashboard" && (tasksError || lettersError)) || (view === "submissions" && lettersError)) && (
+            <div role="alert" className="mb-4 rounded-lg border border-line bg-surface p-4 text-midnight">
+              <p>{view === "dashboard" ? tasksError || lettersError : lettersError}</p>
+              <button type="button" onClick={() => void refresh()} className="mt-2 underline">Muat ulang data</button>
+            </div>
+          )}
           {view === "dashboard" && (
             <div className="mb-6">
               <SubmissionSearch value={searchQuery} onChange={setSearchQuery} />

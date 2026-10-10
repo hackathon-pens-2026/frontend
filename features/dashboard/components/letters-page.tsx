@@ -11,8 +11,10 @@ import { downloadFinalLetter, listMyLetters } from "@/lib/api/letters";
 import { saveBlob } from "@/lib/display/download";
 import { toDashboardLetter } from "../adapters";
 import { DashboardLetter, FilterStatus } from "../types";
+import { useSession } from "@/lib/auth/session-provider";
 
 export function LettersPage() {
+  const { user, status: sessionStatus } = useSession();
   const router = useRouter();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,11 @@ export function LettersPage() {
   };
 
   useEffect(() => {
+    if (sessionStatus !== "authenticated" || !user?.id) return;
     let active = true;
+    Promise.resolve().then(() => {
+      if (active) { setLoading(true); setDataAvailable(false); setLetters([]); }
+    });
     listMyLetters(1, 100)
       .then((result) => {
         if (!active) return;
@@ -52,7 +58,7 @@ export function LettersPage() {
           return;
         }
         setError(
-          cause instanceof ApiError
+          cause instanceof Error
             ? cause.message
             : "Daftar surat tidak dapat dimuat.",
         );
@@ -63,7 +69,7 @@ export function LettersPage() {
     return () => {
       active = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, user?.id, sessionStatus]);
 
   const handleDownload = useCallback(
     async (letter: DashboardLetter) => {

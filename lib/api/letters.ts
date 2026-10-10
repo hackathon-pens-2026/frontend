@@ -12,8 +12,12 @@ import type {
   SubmitLetterRequest,
 } from "./types";
 
-export function listMyLetters(page = 1, pageSize = 20): Promise<LetterListDto> {
-  return apiFetch<LetterListDto>(`/letters?page=${page}&pageSize=${pageSize}`);
+export async function listMyLetters(page = 1, pageSize = 20): Promise<LetterListDto> {
+  const result = await apiFetch<LetterListDto>(`/letters?page=${page}&pageSize=${pageSize}`);
+  if (!result || !Array.isArray(result.items) || !Number.isInteger(result.total) || result.total < result.items.length || (result.total > 0 && result.items.length === 0 && page === 1)) {
+    throw new Error("Respons daftar surat tidak sesuai kontrak API. Data tidak dapat ditampilkan.");
+  }
+  return result;
 }
 
 export function getLetter(id: string): Promise<DraftDto> {

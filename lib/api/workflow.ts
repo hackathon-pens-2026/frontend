@@ -11,8 +11,12 @@ import type {
   WorkflowTaskDto,
 } from "./types";
 
-export function listMyTasks(page = 1, pageSize = 20): Promise<WorkflowQueueDto> {
-  return apiFetch<WorkflowQueueDto>(`/tasks?page=${page}&pageSize=${pageSize}`);
+export async function listMyTasks(page = 1, pageSize = 20): Promise<WorkflowQueueDto> {
+  const result = await apiFetch<WorkflowQueueDto>(`/tasks?page=${page}&pageSize=${pageSize}`);
+  if (!result || !Array.isArray(result.items) || !Number.isInteger(result.total) || result.total < result.items.length || (result.total > 0 && result.items.length === 0 && page === 1)) {
+    throw new Error("Respons antrean tugas tidak sesuai kontrak API. Data tidak dapat ditampilkan.");
+  }
+  return result;
 }
 
 export function getTask(id: string): Promise<WorkflowTaskDto> {

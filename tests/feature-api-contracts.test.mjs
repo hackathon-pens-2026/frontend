@@ -4,11 +4,11 @@ import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
 
-function load(name) {
+function load(name, response = {}) {
   const exports = {};
   const calls = [];
   const transport = {
-    apiFetch: async (path, options) => { calls.push({ path, options }); return {}; },
+    apiFetch: async (path, options) => { calls.push({ path, options }); return response; },
     apiDownload: async (path) => { calls.push({ path }); return new Blob(); },
   };
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL(`../lib/api/${name}.ts`, import.meta.url), "utf8"), {
@@ -46,4 +46,22 @@ test("resume and revocation use backend task mutations, not local status updates
   assert.equal(calls[0].path, "/tasks/task/resume");
   assert.equal(calls[1].path, "/tasks/task/revoke-delegation");
   assert.equal(calls[1].options.json, request);
+});
+
+test("letter and task lists preserve returned rows instead of replacing them with empty data", async () => {
+  for (const [module, method] of [["letters", "listMyLetters"], ["workflow", "listMyTasks"]]) {
+    const response = { page: 1, pageSize: 20, total: 1, items: [{ id: "actual-server-row" }] };
+    const { api } = load(module, response);
+    assert.equal(await api[method](), response);
+    const empty = { page: 1, pageSize: 20, total: 0, items: [] };
+    assert.equal(await load(module, empty).api[method](), empty);
+  }
+});
+
+test("invalid or inconsistent list payloads are errors, not an empty inbox", async () => {
+  for (const [module, method] of [["letters", "listMyLetters"], ["workflow", "listMyTasks"]]) {
+    for (const response of [{}, { total: 1, items: [] }, { total: 0, items: [{ id: "row" }] }]) {
+      await assert.rejects(load(module, response).api[method](), /kontrak API/);
+    }
+  }
 });

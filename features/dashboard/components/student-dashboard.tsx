@@ -6,11 +6,9 @@ import { DashboardLetter, FilterStatus, SummaryMetric } from "../types";
 import { SummaryCards } from "./summary-cards";
 import { AttentionSection } from "./attention-section";
 import { RecentLetters } from "./recent-letters";
-import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
 import { StudentSidebar } from "@/features/shell/components/student-sidebar";
+import { SubmissionSearch } from "@/features/shell/components/submission-search";
 import {
-  SearchIcon,
-  PlusIcon,
   DownloadIcon,
   XIcon,
   CheckIcon,
@@ -33,14 +31,6 @@ interface DrawerStep {
   hash?: string;
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + second).toUpperCase();
-}
-
 function toDrawerStep(task: WorkflowTaskDto): DrawerStep {
   const badge = taskStatusToBadge(task.status);
   return {
@@ -54,18 +44,17 @@ function toDrawerStep(task: WorkflowTaskDto): DrawerStep {
 }
 
 export default function StudentDashboard() {
-  const { user, logout, capabilities } = useSession();
+  const { user } = useSession();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataAvailable, setDataAvailable] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("Semua");
   const [searchQuery, setSearchQuery] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [selectedLetter, setSelectedLetter] = useState<DashboardLetter | null>(null);
   const [drawerSteps, setDrawerSteps] = useState<DrawerStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [qrOpen, setQrOpen] = useState(false);
   const [showAllLetters, setShowAllLetters] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -81,9 +70,16 @@ export default function StudentDashboard() {
         if (!active) return;
         setLetters(result.items.map(toDashboardLetter));
         setError(null);
+        setDataAvailable(true);
       })
       .catch((cause: unknown) => {
         if (!active) return;
+        setDataAvailable(false);
+        // Session handling owns 401s; repeating its login message here is not actionable.
+        if (cause instanceof ApiError && cause.status === 401) {
+          setError(null);
+          return;
+        }
         setError(
           cause instanceof ApiError
             ? cause.message
@@ -170,7 +166,7 @@ export default function StudentDashboard() {
     const waiting = letters.filter((l) => l.status === "pending").length;
     const approved = letters.filter((l) => l.status === "approved").length;
     const revision = letters.filter((l) => l.status === "rejected").length;
-    return [
+    const items: SummaryMetric[] = [
       {
         id: "active",
         title: "Surat Sedang Berjalan",
@@ -200,16 +196,12 @@ export default function StudentDashboard() {
         variant: "neutral",
       },
     ];
-  }, [letters]);
+    return items.map((metric) => ({ ...metric, value: dataAvailable ? metric.value : "—" }));
+  }, [letters, dataAvailable]);
 
   const activeCount = letters.filter(
     (l) => l.status === "review" || l.status === "pending",
   ).length;
-
-  const displayName = user?.name ?? "Memuat…";
-  const displayInitials = user?.name ? initialsOf(user.name) : "…";
-  const displayNumber = user?.nimNip ?? user?.email ?? "";
-  const primaryPosition = user?.assignments[0]?.positionName ?? "Mahasiswa";
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans relative selection:bg-blue-100">
@@ -226,100 +218,9 @@ export default function StudentDashboard() {
 
       <StudentSidebar currentPath="/" letterCount={activeCount} />
 
-      <div className="pl-[260px] min-h-screen flex flex-col bg-[#f8fafc]">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-8 shadow-xs">
-          <div className="relative w-full max-w-[460px]">
-            <SearchIcon
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari nomor surat, jenis izin, atau tahap..."
-              className="h-10 w-full rounded-lg border border-slate-200 bg-[#f8fafc] pr-8 pl-9 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-[#1e3a8a] focus:bg-white focus:ring-2 focus:ring-[#1e3a8a]/10"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-                aria-label="Bersihkan pencarian"
-              >
-                <XIcon size={12} />
-              </button>
-            )}
-          </div>
-
-          <div className="ml-auto flex items-center gap-4">
-            <Link
-              href="/surat/baru"
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1e3a8a] px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-[#172554] cursor-pointer"
-            >
-              <PlusIcon size={16} />
-              <span>Ajukan Surat Izin Baru</span>
-            </Link>
-
-            <div className="h-6 w-px bg-slate-200" />
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowProfileMenu((prev) => !prev)}
-                className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100 transition cursor-pointer"
-                aria-label="Menu Akun Mahasiswa"
-                aria-expanded={showProfileMenu}
-              >
-                <span className="flex size-9 items-center justify-center rounded-full bg-[#dbeafe] text-xs font-bold text-[#1e3a8a]">
-                  {displayInitials}
-                </span>
-              </button>
-
-              {showProfileMenu && (
-                <div className="animate-rise absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl z-50">
-                  <div className="border-b border-slate-100 px-3 pt-2 pb-3">
-                    <div className="text-xs font-semibold text-slate-900">{displayName}</div>
-                    <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-                      {displayNumber} · {primaryPosition}
-                    </div>
-                  </div>
-                  <div className="border-b border-slate-100 py-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowProfileMenu(false);
-                        setQrOpen(true);
-                      }}
-                      className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-xs text-slate-700 hover:bg-slate-50 transition font-medium cursor-pointer"
-                    >
-                      <span>QR Tanda Tangan</span>
-                    </button>
-                    {capabilities.some((capability) => capability === "Signer" || capability === "Approver") && <Link
-                      href="/persetujuan"
-                      className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-xs text-slate-700 hover:bg-slate-50 transition font-medium cursor-pointer"
-                    >
-                      <span>Persetujuan Saya</span>
-                    </Link>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      setShowProfileMenu(false);
-                      await logout();
-                    }}
-                    className="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-3 text-xs text-red-600 hover:bg-red-50 transition cursor-pointer"
-                  >
-                    <span>Keluar dari Akun</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="mx-auto w-full max-w-[1240px] space-y-6 px-8 py-6 flex-1 bg-[#f8fafc]">
-            <div className="flex items-end justify-between">
+      <div className="md:pl-[260px] min-h-screen min-w-0 flex flex-col bg-canvas">
+        <main className="mx-auto w-full max-w-[1240px] space-y-6 px-4 pb-6 pt-16 md:px-8 md:pt-6 flex-1 bg-canvas">
+            <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                   Selamat Datang, {(user?.name ?? "Mahasiswa").split(" ")[0]}
@@ -329,22 +230,19 @@ export default function StudentDashboard() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-xs">
-                <span className="relative flex size-2">
-                  <span className="absolute inset-0 animate-ping rounded-full bg-emerald-500 opacity-60" />
-                  <span className="relative size-2 rounded-full bg-emerald-500" />
-                </span>
-                <span>{loading ? "Memuat data…" : "Tersinkron dengan server"}</span>
+              <div role="status" className="flex shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-midnight/60 shadow-xs">
+                <span aria-hidden="true" className={`size-2 rounded-full ${dataAvailable ? "bg-ok" : "bg-midnight/30"}`} />
+                <span>{loading ? "Memuat data…" : dataAvailable ? "Tersinkron dengan server" : "Data belum tersedia"}</span>
               </div>
             </div>
 
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
-                {error}
+              <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-revision-border bg-revision-bg px-4 py-3 text-xs text-revision">
+                <span>{error}</span>
                 <button
                   type="button"
                   onClick={retryLoadLetters}
-                  className="ml-2 font-semibold underline cursor-pointer"
+                  className="font-semibold underline focus-visible:outline-2 focus-visible:outline-revision cursor-pointer"
                 >
                   Coba lagi
                 </button>
@@ -366,7 +264,11 @@ export default function StudentDashboard() {
             />
 
             <div id="letters-section">
+              <div className="mb-4">
+                <SubmissionSearch value={searchQuery} onChange={setSearchQuery} />
+              </div>
               <RecentLetters
+                emptyMessage={dataAvailable ? undefined : "Data pengajuan belum tersedia."}
                 letters={showAllLetters ? filteredLetters : filteredLetters.slice(0, 6)}
                 currentFilter={filter}
                 onFilterChange={setFilter}
@@ -517,33 +419,6 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      {qrOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="QR tanda tangan"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
-          onClick={() => setQrOpen(false)}
-        >
-          <div
-            className="animate-rise w-full max-w-sm rounded-xl bg-white p-5 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">QR Tanda Tangan</h2>
-              <button
-                type="button"
-                aria-label="Tutup"
-                onClick={() => setQrOpen(false)}
-                className="flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-              >
-                <XIcon size={16} />
-              </button>
-            </div>
-            <SignatureQrPanel />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

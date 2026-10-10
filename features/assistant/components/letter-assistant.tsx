@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation";
 import { AssistantMessage } from "../types";
 import { StudentSidebar } from "@/features/shell";
-import { AssistantHeader } from "./assistant-header";
 import { DraftSummary, DraftStatus } from "./draft-summary";
 import {
   ArrowDownIcon,
@@ -163,7 +162,9 @@ export function LetterAssistant() {
       } catch (cause) {
         if (!cancelled.current) {
           setTemplatesError(
-            errorText(cause, "Katalog template tidak dapat dimuat dari server."),
+            cause instanceof ApiError && cause.status === 401
+              ? null
+              : errorText(cause, "Katalog template tidak dapat dimuat dari server."),
           );
         }
       }
@@ -699,20 +700,15 @@ export function LetterAssistant() {
   }, [template, missingRequired, organizationId]);
 
   return (
-    <div className="flex h-screen min-w-[1240px] bg-canvas text-midnight selection:bg-blue-100">
+    <div className="flex min-h-dvh min-w-0 bg-canvas text-midnight xl:h-dvh">
       <StudentSidebar currentPath="/surat/baru" />
 
-      <div className="flex min-w-0 flex-1 flex-col pl-[260px] overflow-hidden">
-        <AssistantHeader
-          isSaving={status === "saving"}
-          lastSavedTime={draftSavedAt ?? "-"}
-        />
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(480px,3fr)_minmax(360px,2fr)] gap-6 p-6 lg:p-7 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col pt-16 md:pt-0 md:pl-[260px] overflow-hidden">
+        <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:gap-6 xl:p-7 xl:overflow-hidden">
           {/* Chat Workspace (Left) */}
           <section
             aria-label="Asisten surat"
-            className="relative flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-white shadow-card"
+            className="relative flex min-h-[36rem] min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-card xl:min-h-0"
           >
             {/* Header with backend connection indicator */}
             <div className="flex items-center justify-between border-b border-line px-5 py-3.5 bg-canvas/40">
@@ -734,7 +730,7 @@ export function LetterAssistant() {
                     />
                     <span>
                       {isBackendConnected === true
-                        ? "Terhubung ke AI Assistant Backend & SSO"
+                        ? "Terhubung ke AI Assistant Backend"
                         : isBackendConnected === false
                         ? "Mode Simulasi Lokal (Offline)"
                         : "Menghubungkan ke backend…"}

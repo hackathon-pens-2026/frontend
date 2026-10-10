@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StudentSidebar } from "@/features/shell";
 import { AttentionSection } from "./attention-section";
 import { RecentLetters } from "./recent-letters";
-import { PlusIcon, SearchIcon, XIcon } from "./icons";
+import { SubmissionSearch } from "@/features/shell/components/submission-search";
 import { ApiError } from "@/lib/api/errors";
 import { downloadLetterDocument, listMyLetters } from "@/lib/api/letters";
 import { saveBlob } from "@/lib/display/download";
@@ -18,6 +17,7 @@ export function LettersPage() {
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dataAvailable, setDataAvailable] = useState(false);
   const [filter, setFilter] = useState<FilterStatus>("Semua");
   const [searchQuery, setSearchQuery] = useState("");
   const [toastMessage, setToastMessage] = useState("");
@@ -35,9 +35,15 @@ export function LettersPage() {
         if (!active) return;
         setLetters(result.items.map(toDashboardLetter));
         setError(null);
+        setDataAvailable(true);
       })
       .catch((cause: unknown) => {
         if (!active) return;
+        setDataAvailable(false);
+        if (cause instanceof ApiError && cause.status === 401) {
+          setError(null);
+          return;
+        }
         setError(
           cause instanceof ApiError
             ? cause.message
@@ -110,42 +116,8 @@ export function LettersPage() {
 
       <StudentSidebar currentPath="/surat" letterCount={letters.filter((l) => l.status !== "approved").length} />
 
-      <div className="pl-[260px] min-h-screen flex flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line bg-white px-8 shadow-xs">
-          <div className="relative w-full max-w-[460px]">
-            <SearchIcon
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Cari nomor surat, jenis izin, atau tahap..."
-              className="h-10 w-full rounded-lg border border-line bg-canvas pr-8 pl-9 text-xs text-slate-900 placeholder:text-slate-400 outline-none transition-all focus:border-navy focus:bg-white focus:ring-2 focus:ring-navy/10"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
-                aria-label="Bersihkan pencarian"
-              >
-                <XIcon size={12} />
-              </button>
-            )}
-          </div>
-
-          <Link
-            href="/surat/baru"
-            className="ml-auto inline-flex h-10 items-center gap-2 rounded-lg bg-navy px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-navy-hover cursor-pointer"
-          >
-            <PlusIcon size={16} />
-            <span>Ajukan Surat Baru</span>
-          </Link>
-        </header>
-
-        <main className="mx-auto w-full max-w-[1240px] space-y-6 px-8 py-6 flex-1">
+      <div className="md:pl-[260px] min-h-screen min-w-0 flex flex-col">
+        <main className="mx-auto w-full max-w-[1240px] space-y-6 px-4 pb-6 pt-16 md:px-8 md:pt-6 flex-1">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               Surat Saya
@@ -157,20 +129,22 @@ export function LettersPage() {
           </div>
 
           {error && (
-            <div className="rounded-lg border border-revision-border bg-revision-bg px-4 py-3 text-xs text-revision">
-              {error}
+            <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-revision-border bg-revision-bg px-4 py-3 text-xs text-revision">
+              <span>{error}</span>
               <button
                 type="button"
                 onClick={() => {
                   setLoading(true);
                   setReloadKey((key) => key + 1);
                 }}
-                className="ml-2 font-semibold underline cursor-pointer"
+                className="font-semibold underline focus-visible:outline-2 focus-visible:outline-revision cursor-pointer"
               >
                 Coba lagi
               </button>
             </div>
           )}
+
+          <SubmissionSearch value={searchQuery} onChange={setSearchQuery} />
 
           <AttentionSection
             letters={letters}
@@ -185,6 +159,7 @@ export function LettersPage() {
             </p>
           ) : (
             <RecentLetters
+              emptyMessage={dataAvailable ? undefined : "Data pengajuan belum tersedia."}
               letters={filteredLetters}
               currentFilter={filter}
               onFilterChange={setFilter}

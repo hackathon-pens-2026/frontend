@@ -9,16 +9,14 @@ import {
   InboxIcon,
   HelpCircleIcon,
   MailIcon,
-  ShieldCheckIcon,
   SignItIcon,
   SparklesIcon,
-  XIcon,
 } from "@/components/ui";
 import { useSession } from "@/lib/auth/session-provider";
-import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
 import { listMyLetters } from "@/lib/api/letters";
 import { listMyTasks } from "@/lib/api/workflow";
 import { UserSwitcher } from "./user-switcher";
+import { SidebarFrame } from "./sidebar-frame";
 
 interface StudentSidebarProps {
   currentPath?: string;
@@ -34,15 +32,13 @@ export function StudentSidebar({
   const pathname = usePathname();
   const currentPath = propPath ?? pathname ?? "/";
   const { user, capabilities } = useSession();
-  const [qrOpen, setQrOpen] = useState(false);
-  const [letterCount, setLetterCount] = useState<number | undefined>(propLetterCount);
-  const [pendingCount, setPendingCount] = useState<number | undefined>(propPendingCount);
+  const [loadedLetterCount, setLetterCount] = useState<number>();
+  const [loadedPendingCount, setPendingCount] = useState<number>();
+  const letterCount = propLetterCount ?? loadedLetterCount;
+  const pendingCount = propPendingCount ?? loadedPendingCount;
 
   useEffect(() => {
-    if (propLetterCount !== undefined) {
-      setLetterCount(propLetterCount);
-      return;
-    }
+    if (propLetterCount !== undefined) return;
     let active = true;
     listMyLetters(1, 50)
       .then((res) => {
@@ -52,13 +48,10 @@ export function StudentSidebar({
     return () => {
       active = false;
     };
-  }, [propLetterCount]);
+  }, [propLetterCount, user?.id]);
 
   useEffect(() => {
-    if (propPendingCount !== undefined) {
-      setPendingCount(propPendingCount);
-      return;
-    }
+    if (propPendingCount !== undefined) return;
     if (!capabilities.some((c) => c === "Signer" || c === "Approver")) return;
     let active = true;
     listMyTasks(1, 50)
@@ -69,7 +62,7 @@ export function StudentSidebar({
     return () => {
       active = false;
     };
-  }, [propPendingCount, capabilities]);
+  }, [propPendingCount, capabilities, user?.id]);
 
   const canApprove = capabilities.some((capability) => capability === "Signer" || capability === "Approver");
 
@@ -79,13 +72,6 @@ export function StudentSidebar({
       label: "Dasbor Beranda",
       href: "/",
       icon: DashboardIcon,
-    },
-    {
-      id: "assistant",
-      label: "Asisten Surat AI",
-      href: "/surat/baru",
-      icon: SparklesIcon,
-      highlight: true,
     },
     {
       id: "letters",
@@ -100,7 +86,7 @@ export function StudentSidebar({
   ];
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-midnight px-4 py-5 select-none text-white shadow-xl">
+    <SidebarFrame>
       {/* Brand Header */}
       <div className="flex items-center gap-3 px-2 pb-5">
         <Link href="/" className="group flex items-center gap-3">
@@ -119,59 +105,24 @@ export function StudentSidebar({
       {/* User Switcher Dropdown */}
       <UserSwitcher />
 
-      {/* QR Tanda Tangan */}
-      <button
-        type="button"
-        onClick={() => setQrOpen(true)}
-        className="mb-5 flex h-11 w-full items-center gap-3 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-body font-medium text-slate-300 hover:bg-white/10 hover:text-white cursor-pointer"
-      >
-        <ShieldCheckIcon className="size-[18px] text-gold" />
-        <span>QR Tanda Tangan</span>
-      </button>
-
-      {qrOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="QR tanda tangan"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-midnight/60 p-4 backdrop-blur-sm"
-          onClick={() => setQrOpen(false)}
-        >
-          <div
-            className="animate-rise w-full max-w-sm rounded-xl bg-white p-5 text-midnight shadow-modal"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-title font-semibold">QR Tanda Tangan</h2>
-              <button
-                type="button"
-                aria-label="Tutup"
-                onClick={() => setQrOpen(false)}
-                className="flex size-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 cursor-pointer"
-              >
-                <XIcon className="size-4" />
-              </button>
-            </div>
-            <SignatureQrPanel />
-          </div>
-        </div>
-      )}
-
       {/* Nav Menu */}
       <div className="px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
         Menu Utama
       </div>
-      <nav className="flex flex-col gap-1.5" aria-label="Menu Mahasiswa">
+      <nav className="shrink-0" aria-label="Menu Mahasiswa">
+        <ul className="flex flex-col gap-1.5">
         {navItems.map((item) => {
+          const isAssistant = currentPath === "/surat/baru";
           const isActive =
             currentPath === item.href ||
-            (item.href !== "/" && Boolean(currentPath?.startsWith(item.href)));
+            (item.href !== "/" && currentPath.startsWith(`${item.href}/`) && !isAssistant);
 
           return (
+            <li key={item.id}>
             <Link
-              key={item.id}
               href={item.href}
-              className={`relative flex h-11 w-full items-center gap-3 rounded-lg px-3 text-body font-medium transition-colors ${
+              aria-current={isActive ? "page" : undefined}
+              className={`relative flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-body font-medium transition-colors focus-visible:outline-2 focus-visible:outline-gold ${
                 isActive
                   ? "bg-white/10 text-white font-semibold"
                   : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
@@ -181,28 +132,39 @@ export function StudentSidebar({
                 <span className="absolute top-2 bottom-2 -left-4 w-1 rounded-r-full bg-gold" />
               )}
               <item.icon
-                className={`size-[18px] ${
-                  isActive
-                    ? item.highlight
-                      ? "text-gold"
-                      : "text-white"
-                    : "text-slate-400"
-                }`}
+                aria-hidden="true"
+                className={`size-[18px] shrink-0 ${isActive ? "text-white" : "text-white/60"}`}
                 strokeWidth={2}
               />
-              <span className="flex-1 text-left">{item.label}</span>
+              <span className="min-w-0 flex-1 text-left">{item.label}</span>
               {item.badge !== undefined && item.badge > 0 && (
                 <span className="rounded-full bg-gold px-1.5 py-px text-[11px] font-bold text-midnight tabular-nums">
                   {item.badge}
                 </span>
               )}
             </Link>
+            {item.id === "letters" && (
+              <ul aria-label="Submenu Surat Saya" className="ml-5 mt-1 border-l border-white/15 pl-3">
+                <li>
+                  <Link
+                    href="/surat/baru"
+                    aria-current={isAssistant ? "page" : undefined}
+                    className={`flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-micro font-medium transition-colors focus-visible:outline-2 focus-visible:outline-gold ${isAssistant ? "bg-white/10 text-gold" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
+                  >
+                    <SparklesIcon aria-hidden="true" className="size-4 shrink-0" />
+                    <span>Asisten Surat AI</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+            </li>
           );
         })}
+        </ul>
       </nav>
 
       {/* Footer Support & Info */}
-      <div className="mt-auto space-y-1 border-t border-white/10 pt-3">
+      <div className="mt-auto shrink-0 space-y-1 border-t border-white/10 pt-3">
         <Link
           href="/"
           className="flex h-10 w-full items-center gap-3 rounded-lg px-3 text-body font-medium text-slate-400 hover:bg-white/5 hover:text-slate-200 transition-colors"
@@ -212,10 +174,10 @@ export function StudentSidebar({
         </Link>
         <div className="flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] text-slate-500">
           <MailIcon className="size-3.5" />
-          <span>Pemberitahuan via email SSO</span>
+          <span>Pemberitahuan via email</span>
         </div>
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }
 export default StudentSidebar;

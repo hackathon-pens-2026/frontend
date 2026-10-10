@@ -12,6 +12,7 @@ import {
   SignItIcon,
 } from "@/components/ui";
 import { UserSwitcher } from "./user-switcher";
+import { SidebarFrame } from "./sidebar-frame";
 
 interface StaffSidebarProps {
   view: NavView;
@@ -45,7 +46,7 @@ export function StaffSidebar({
   ];
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-midnight px-4 py-5">
+    <SidebarFrame>
       {/* Brand Header */}
       <div className="flex items-center gap-3 px-2 pb-6">
         <SignItIcon className="size-10 rounded-xl shadow-lift" />
@@ -112,6 +113,6 @@ export function StaffSidebar({
           <span>Notifikasi dikirim via email resmi</span>
         </div>
       </div>
-    </aside>
+    </SidebarFrame>
   );
 }

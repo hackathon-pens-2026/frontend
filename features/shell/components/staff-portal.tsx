@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { NavView } from "../types";
 import { StaffSidebar } from "./staff-sidebar";
-import { StaffHeader } from "./staff-header";
+import { SubmissionSearch } from "./submission-search";
 import { StudentSidebar } from "./student-sidebar";
 import { StaffDashboard } from "@/features/dashboard/components/staff-dashboard";
 import { InboxView } from "@/features/inbox/components/inbox-view";
@@ -18,6 +18,7 @@ import { useSession } from "@/lib/auth/session-provider";
 import type { LetterSummaryDto, WorkflowTaskDto } from "@/lib/api/types";
 
 function describeError(cause: unknown) {
+  if (cause instanceof ApiError && cause.status === 401) return "Data persetujuan belum tersedia.";
   return cause instanceof ApiError
     ? cause.message
     : "Data tidak dapat dimuat dari server.";
@@ -25,19 +26,14 @@ function describeError(cause: unknown) {
 
 export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }) {
   const router = useRouter();
-  const { user, uiSurface, userCategory } = useSession();
+  const { uiSurface, userCategory } = useSession();
   const isStudent =
     studentInbox ||
     uiSurface === "Student" ||
     userCategory === "StudentDagri" ||
     userCategory === "StudentGeneral";
-  const [view, setView] = useState<NavView>(studentInbox || isStudent ? "inbox" : "dashboard");
-
-  useEffect(() => {
-    if (isStudent && view === "dashboard") {
-      setView("inbox");
-    }
-  }, [isStudent, view]);
+  const [selectedView, setView] = useState<NavView>(isStudent ? "inbox" : "dashboard");
+  const view = isStudent && selectedView === "dashboard" ? "inbox" : selectedView;
   const [tasks, setTasks] = useState<WorkflowTaskDto[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -142,7 +138,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
   };
 
   return (
-    <div className="min-h-screen min-w-[1280px] bg-canvas text-midnight">
+    <div className="min-h-screen min-w-0 bg-canvas text-midnight">
       {isStudent ? (
         <StudentSidebar currentPath="/persetujuan" pendingCount={pendingCount} />
       ) : (
@@ -153,20 +149,13 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
         />
       )}
 
-      <div className="pl-[260px]">
-        <StaffHeader
-          profile={{
-            name: "",
-            short: "",
-            role: "",
-            nip: "",
-          }}
-          onNew={() => router.push("/surat/baru")}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-        />
-
-        <main className="mx-auto max-w-[1440px] px-8 lg:px-20 py-8">
+      <div className="min-w-0 md:pl-[260px]">
+        <main className="mx-auto max-w-[1440px] px-4 pb-8 pt-16 md:px-8 md:pt-8 lg:px-20">
+          {(view === "dashboard" || view === "inbox") && (
+            <div className="mb-6">
+              <SubmissionSearch value={searchQuery} onChange={setSearchQuery} />
+            </div>
+          )}
           {view === "dashboard" && (
             <StaffDashboard
               priorityLetters={filteredLetters.map((letter) => ({

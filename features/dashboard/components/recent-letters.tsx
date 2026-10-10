@@ -14,6 +14,7 @@ interface RecentLettersProps {
   onFilterChange: (filter: FilterStatus) => void;
   onSelectLetter: (letter: DashboardLetter) => void;
   onDownloadPdf: (letter: DashboardLetter) => void;
+  emptyMessage?: string;
 }
 
 export function RecentLetters({
@@ -22,6 +23,7 @@ export function RecentLetters({
   onFilterChange,
   onSelectLetter,
   onDownloadPdf,
+  emptyMessage = "Tidak ada dokumen pengajuan dengan filter ini.",
 }: RecentLettersProps) {
   const tabs: FilterStatus[] = ["Semua", "Berjalan", "Disetujui", "Revisi"];
 
@@ -119,7 +121,7 @@ export function RecentLetters({
             {letters.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-5 py-10 text-center text-xs text-slate-400">
-                  Tidak ada dokumen pengajuan dengan filter ini.
+                  {emptyMessage}
                 </td>
               </tr>
             ) : (

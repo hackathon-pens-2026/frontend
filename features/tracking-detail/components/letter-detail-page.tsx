@@ -15,7 +15,7 @@ export function LetterDetailPage() {
   return (
     <div className="min-h-screen bg-canvas">
       <StudentSidebar currentPath="/surat" />
-      <div className="pl-[260px]">
+      <div className="pt-16 md:pt-0 md:pl-[260px]">
         {GUID_PATTERN.test(id) ? (
           <TrackingDetail
             letterId={id}

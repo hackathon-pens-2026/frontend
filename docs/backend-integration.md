@@ -1,6 +1,6 @@
 # Integrasi dan routing
 
-Frontend memakai BFF same-origin `/api/v1/*`; `/api/backend/*` merupakan alias kompatibilitas dengan cookie dan refresh yang sama. `BACKEND_URL` hanya dibaca server Next.js. Konfigurasi proyek ini menunjuk backend Azure; tidak ada fallback otomatis ke localhost. Browser tetap memanggil origin frontend, lalu Next.js meneruskan permintaan ke Azure.
+Frontend memakai BFF same-origin `/api/v1/*`; `/api/backend/*` merupakan alias kompatibilitas dengan cookie dan refresh yang sama. `BACKEND_URL` hanya dibaca server Next.js. Konfigurasi proyek ini menunjuk backend Azure; tidak ada fallback otomatis ke localhost. Browser tetap memanggil origin frontend, lalu Next.js meneruskan permintaan ke Azure. Untuk pengembangan lokal, salin `.env.example` menjadi `.env.local` dan set `BACKEND_URL=http://localhost:5217`; tanpa itu BFF membalas 503 `backend_configuration_missing` dan daftar/detail surat tampak kosong.
 
 Login memakai akun provisioned. Cookie `signit_at` dan `signit_rt` bersifat HttpOnly, SameSite=Lax, Secure pada production. Token tidak diberikan sebagai JSON ke browser dan tidak disimpan di localStorage. Mutasi BFF memeriksa Origin. Refresh single-flight dipisahkan berdasarkan hash token sesi; tiap response menulis cookie hasil rotasi sendiri. Koordinasi ini berlaku dalam satu proses Next.js; deployment multi-instance membutuhkan koordinasi bersama sebelum mengklaim refresh serentak lintas instance aman.
 

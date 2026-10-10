@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api/client";
-import { logoutAction } from "@/lib/auth/actions";
+import { loginPersonaAction, logoutAction } from "@/lib/auth/actions";
 import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
 import { destinationByPosition, routeRedirect } from "./routing";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
@@ -60,23 +60,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
   const [status, setStatus] = useState<SessionStatus>("authenticated");
 
-  // Load persisted demo persona and position from localStorage on mount
+  // Pulihkan persona tersimpan lalu login nyata ke backend agar cookie sesi
+  // (pratinjau dokumen, chat, daftar surat) benar-benar tersedia.
   useEffect(() => {
+    let active = true;
+    let savedPersonaId: string | null = null;
+    let savedPosition: string | null = null;
     try {
-      const savedPersona = localStorage.getItem("signit_active_persona");
-      const savedPosition = localStorage.getItem("signit_active_position");
-      if (savedPersona) {
-        const found = DEMO_PERSONAS.find((p) => p.id === savedPersona);
-        if (found) {
-          const dto = personaToUserDto(found);
-          setCurrentPersonaId(found.id);
-          setUser(dto);
-          setActivePosition(extractActivePosition(dto, savedPosition ?? undefined));
-        }
-      }
+      savedPersonaId = localStorage.getItem("signit_active_persona");
+      savedPosition = localStorage.getItem("signit_active_position");
     } catch {
-      // Ignore localStorage errors
+      // localStorage tidak tersedia
     }
+    const found =
+      DEMO_PERSONAS.find((persona) => persona.id === savedPersonaId) ?? DEMO_PERSONAS[0];
+    loginPersonaAction(found.id)
+      .then((realUser) => {
+        if (!active) return;
+        setCurrentPersonaId(found.id);
+        setUser(realUser);
+        setActivePosition(extractActivePosition(realUser, savedPosition ?? undefined));
+        setStatus("authenticated");
+      })
+      .catch(() => {
+        // Tanpa sesi nyata, halaman menampilkan error jujur dari backend.
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Optional background sync with backend /me if a real backend session exists
@@ -114,32 +125,34 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [user, pathname, router]);
 
-  // Switch user callback: updates persona & position, and auto-routes to appropriate view
+  // Ganti persona: login nyata ke backend memakai akun UAT persona tersebut,
+  // lalu arahkan ke tampilan sesuai jabatan.
   const switchUser = useCallback(
     (personaId: string) => {
       const target = DEMO_PERSONAS.find((p) => p.id === personaId);
       if (!target) return;
-
-      setCurrentPersonaId(target.id);
-      const dto = personaToUserDto(target);
-      const newPos = extractActivePosition(dto);
-
-      setUser(dto);
-      setActivePosition(newPos);
-      setStatus("authenticated");
-
-      try {
-        localStorage.setItem("signit_active_persona", target.id);
-        localStorage.setItem("signit_active_position", newPos.positionCode);
-      } catch {
-        // Ignore
-      }
-
-      // Auto-navigate to the optimal destination according to the new position
-      const destination = destinationByPosition(newPos.positionCode, target.uiSurface);
-      if (destination && destination !== pathname) {
-        router.push(destination);
-      }
+      loginPersonaAction(target.id)
+        .then((realUser) => {
+          const newPos = extractActivePosition(realUser);
+          setCurrentPersonaId(target.id);
+          setUser(realUser);
+          setActivePosition(newPos);
+          setStatus("authenticated");
+          try {
+            localStorage.setItem("signit_active_persona", target.id);
+            localStorage.setItem("signit_active_position", newPos.positionCode);
+          } catch {
+            // Ignore
+          }
+          const destination = destinationByPosition(newPos.positionCode, realUser.uiSurface);
+          if (destination && destination !== pathname) {
+            router.push(destination);
+          }
+        })
+        .catch(() => {
+          // Login persona gagal (env/seed belum siap); halaman akan
+          // menampilkan error jujur dari endpoint backend.
+        });
     },
     [pathname, router],
   );

@@ -458,32 +458,10 @@ export function LetterAssistant() {
         setStatus("idle");
         if (!silent) addMessage("Draf tersimpan di server.", "bot", "success");
         return saved;
-      } catch {
-        // Fallback untuk mode simulasi demo
-        const simulated: DraftDto = {
-          id: draft?.id ?? `draft-sim-${Date.now()}`,
-          typeId: template.typeId,
-          title: (
-            (fields["nama_kegiatan"] ?? "").trim() ||
-            template.name ||
-            "Draf Surat"
-          ).slice(0, 300),
-          version: "1.0",
-          revisionId: "rev-sim-local",
-          contentHash: "hash-sim-local",
-          dataJson: JSON.stringify(fields),
-        };
-        setDraft(simulated);
-        setDraftSavedAt(timeNow());
-        setDirty(false);
+      } catch (cause) {
         setStatus("idle");
-        if (!silent)
-          addMessage(
-            "Draf berhasil disimpan (Mode Simulasi Lokal).",
-            "bot",
-            "success",
-          );
-        return simulated;
+        addMessage(errorText(cause, "Draf gagal disimpan. Coba kembali."), "bot", "error");
+        return null;
       }
     },
     [template, fields, draft, missingRequired.length, userFields, addMessage],
@@ -546,36 +524,8 @@ export function LetterAssistant() {
           "error",
         );
       }
-    } catch {
-      // Fallback preview simulasi bila server offline
-      const current = draft ?? (await saveDraft(true));
-      const simulatedPreview: LetterPreviewDto = {
-        letterId: current?.id ?? `draft-sim-${Date.now()}`,
-        jobId: `job-sim-${Date.now()}`,
-        state: "Ready",
-        reviewDocumentId: `doc-sim-${Date.now()}`,
-        reviewHash: "hash-review-sim",
-        revisionId: current?.revisionId ?? "rev-sim-local",
-        errorCode: null,
-        downloadUrl: null,
-        slots: [
-          {
-            positionCode: "Ketupel",
-            pageIndex: 1,
-            x: 100,
-            y: 200,
-            width: 120,
-            height: 60,
-          },
-        ],
-      };
-      setPreview(simulatedPreview);
-      addMessage(
-        "Pratinjau draf siap (Mode Simulasi). Periksa dokumen di panel kanan sebelum mengajukan.",
-        "bot",
-        "success",
-        "pdf",
-      );
+    } catch (cause) {
+      addMessage(errorText(cause, "Pratinjau tidak dapat dibuat."), "bot", "error");
     } finally {
       setStatus("idle");
     }

@@ -367,7 +367,6 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
 
   useEffect(() => {
     let active = true;
-    setTasksLoading(true);
     listMyTasks(1, 100)
       .then((queue) => {
         if (!active) return;
@@ -436,12 +435,8 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
     null;
 
   useEffect(() => {
-    if (!selectedTask) {
-      setSteps([]);
-      return;
-    }
+    if (!selectedTask) return;
     let active = true;
-    setStepsLoading(true);
     getLetterWorkflow(selectedTask.letterId)
       .then((workflow) => {
         if (active) setSteps(workflowSteps(workflow.tasks));

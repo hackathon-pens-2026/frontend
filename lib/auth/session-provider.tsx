@@ -2,19 +2,27 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { apiFetch, UNAUTHORIZED_EVENT } from "@/lib/api/client";
+import { apiFetch } from "@/lib/api/client";
 import { logoutAction } from "@/lib/auth/actions";
 import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
-import { routeRedirect } from "./routing";
+import { destinationByPosition, routeRedirect } from "./routing";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
 
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated" | "error";
+
+export interface ActivePosition {
+  positionCode: string;
+  positionName: string;
+  scope: string;
+  capability: UserCapability;
+}
 
 export interface SessionValue {
   status: SessionStatus;
   user: UserDto | null;
   userCategory: UserCategory | null;
   uiSurface: UiSurface | null;
+  activePosition: ActivePosition | null;
   capabilities: UserCapability[];
   assignments: AssignmentDto[];
   hasCapability: (capability: UserCapability) => boolean;
@@ -23,9 +31,23 @@ export interface SessionValue {
   personas: DemoPersona[];
   currentPersonaId: string;
   switchUser: (personaId: string) => void;
+  switchPosition: (positionCode: string) => void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
+
+function extractActivePosition(user: UserDto, preferredCode?: string): ActivePosition {
+  const asg =
+    (preferredCode ? user.assignments.find((a) => a.positionCode === preferredCode) : null) ??
+    user.assignments[0];
+
+  return {
+    positionCode: asg?.positionCode ?? "Pengaju",
+    positionName: asg?.positionName ?? "Pengaju Himpunan",
+    scope: asg?.scope ?? "uat-himpunan",
+    capability: asg?.capability ?? "Requester",
+  };
+}
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -33,17 +55,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const [currentPersonaId, setCurrentPersonaId] = useState<string>("pengaju");
   const [user, setUser] = useState<UserDto>(() => personaToUserDto(DEMO_PERSONAS[0]));
+  const [activePosition, setActivePosition] = useState<ActivePosition>(() =>
+    extractActivePosition(personaToUserDto(DEMO_PERSONAS[0])),
+  );
   const [status, setStatus] = useState<SessionStatus>("authenticated");
 
-  // Load persisted demo persona from localStorage on mount
+  // Load persisted demo persona and position from localStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("signit_active_persona");
-      if (saved) {
-        const found = DEMO_PERSONAS.find((p) => p.id === saved);
+      const savedPersona = localStorage.getItem("signit_active_persona");
+      const savedPosition = localStorage.getItem("signit_active_position");
+      if (savedPersona) {
+        const found = DEMO_PERSONAS.find((p) => p.id === savedPersona);
         if (found) {
+          const dto = personaToUserDto(found);
           setCurrentPersonaId(found.id);
-          setUser(personaToUserDto(found));
+          setUser(dto);
+          setActivePosition(extractActivePosition(dto, savedPosition ?? undefined));
         }
       }
     } catch {
@@ -51,19 +79,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Try optional background sync with backend /me if real session exists
+  // Optional background sync with backend /me if a real backend session exists
   useEffect(() => {
     let active = true;
     apiFetch<UserDto>("/me", { skipUnauthorizedEvent: true })
       .then((realUser) => {
         if (!active) return;
-        // If a real backend session exists, merge or use it
         if (realUser?.name) {
           setUser(realUser);
+          setActivePosition(extractActivePosition(realUser));
         }
       })
       .catch(() => {
-        // Fallback gracefully to demo persona without kicking user out
+        // Fallback gracefully to demo persona
       });
 
     return () => {
@@ -71,14 +99,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Redirect away from /login if user is already in demo mode
+  // Redirect away from /login if user is in demo mode
   useEffect(() => {
     if (pathname === "/login") {
       router.replace("/");
     }
   }, [pathname, router]);
 
-  // Enforce role-based route access
+  // Enforce role-based and position-based route access
   useEffect(() => {
     const redirect = routeRedirect(user, pathname);
     if (redirect && redirect !== pathname) {
@@ -86,37 +114,59 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [user, pathname, router]);
 
-  // Switch user callback
-  const switchUser = useCallback((personaId: string) => {
-    const target = DEMO_PERSONAS.find((p) => p.id === personaId);
-    if (!target) return;
+  // Switch user callback: updates persona & position, and auto-routes to appropriate view
+  const switchUser = useCallback(
+    (personaId: string) => {
+      const target = DEMO_PERSONAS.find((p) => p.id === personaId);
+      if (!target) return;
 
-    setCurrentPersonaId(target.id);
-    const dto = personaToUserDto(target);
-    setUser(dto);
-    setStatus("authenticated");
+      setCurrentPersonaId(target.id);
+      const dto = personaToUserDto(target);
+      const newPos = extractActivePosition(dto);
 
-    try {
-      localStorage.setItem("signit_active_persona", target.id);
-    } catch {
-      // Ignore
-    }
+      setUser(dto);
+      setActivePosition(newPos);
+      setStatus("authenticated");
 
-    // Auto-navigate between student & management portals if appropriate
-    if (target.uiSurface === "Management" && pathname === "/") {
-      router.push("/manajemen");
-    } else if (target.uiSurface === "Student" && pathname === "/manajemen") {
-      router.push("/");
-    }
-  }, [pathname, router]);
+      try {
+        localStorage.setItem("signit_active_persona", target.id);
+        localStorage.setItem("signit_active_position", newPos.positionCode);
+      } catch {
+        // Ignore
+      }
+
+      // Auto-navigate to the optimal destination according to the new position
+      const destination = destinationByPosition(newPos.positionCode, target.uiSurface);
+      if (destination && destination !== pathname) {
+        router.push(destination);
+      }
+    },
+    [pathname, router],
+  );
+
+  // Switch position callback (for users with multiple assignments)
+  const switchPosition = useCallback(
+    (positionCode: string) => {
+      const newPos = extractActivePosition(user, positionCode);
+      setActivePosition(newPos);
+      try {
+        localStorage.setItem("signit_active_position", newPos.positionCode);
+      } catch {
+        // Ignore
+      }
+      const destination = destinationByPosition(newPos.positionCode, user.uiSurface);
+      if (destination && destination !== pathname) {
+        router.push(destination);
+      }
+    },
+    [user, pathname, router],
+  );
 
   const refresh = useCallback(async () => {
-    // Keep user authenticated
     setStatus("authenticated");
   }, []);
 
   const logout = useCallback(async () => {
-    // Switch back to default student persona instead of forcing login screen
     switchUser("pengaju");
     try {
       await logoutAction();
@@ -131,6 +181,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       user,
       userCategory: user.userCategory,
       uiSurface: user.uiSurface,
+      activePosition,
       capabilities: user.capabilities,
       assignments: user.assignments,
       hasCapability: (capability) => user.capabilities.includes(capability),
@@ -139,8 +190,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       personas: DEMO_PERSONAS,
       currentPersonaId,
       switchUser,
+      switchPosition,
     }),
-    [status, user, refresh, logout, currentPersonaId, switchUser],
+    [status, user, activePosition, refresh, logout, currentPersonaId, switchUser, switchPosition],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

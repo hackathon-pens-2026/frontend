@@ -3,9 +3,10 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSession } from "@/lib/auth/session-provider";
 import { DEMO_PERSONAS, type DemoPersona } from "@/lib/auth/personas";
+import { destinationByPosition } from "@/lib/auth/routing";
 
 export function UserSwitcher() {
-  const { user, currentPersonaId, switchUser } = useSession();
+  const { user, activePosition, currentPersonaId, switchUser } = useSession();
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +41,14 @@ export function UserSwitcher() {
     const first = parts[0]?.[0] ?? "";
     const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
     return (first + second).toUpperCase();
+  }
+
+  function destinationLabel(posCode: string, surface: string): string {
+    const dest = destinationByPosition(posCode, surface as any);
+    if (dest === "/") return "Dasbor Mahasiswa";
+    if (dest === "/persetujuan") return "Kotak Persetujuan";
+    if (dest === "/manajemen") return "Portal Manajemen";
+    return dest;
   }
 
   return (
@@ -77,7 +86,7 @@ export function UserSwitcher() {
             </svg>
           </div>
           <div className="mt-0.5 truncate text-[11px] text-slate-300">
-            {activePersona.positionName}
+            {activePosition?.positionName ?? activePersona.positionName}
           </div>
           <div className="mt-1 flex items-center gap-1.5">
             <span
@@ -94,19 +103,22 @@ export function UserSwitcher() {
 
       {/* Dropdown Menu */}
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1.5 w-[290px] rounded-2xl border border-white/15 bg-[#0f172a] p-2 text-white shadow-2xl backdrop-blur-xl animate-rise">
+        <div className="absolute top-full left-0 z-50 mt-1.5 w-[310px] rounded-2xl border border-white/15 bg-[#0f172a] p-2 text-white shadow-2xl backdrop-blur-xl animate-rise">
           <div className="border-b border-white/10 px-3 py-2">
             <div className="text-micro font-bold text-gold uppercase tracking-wider">
-              Ganti Akun Demo
+              Ganti Jabatan / Peran Demo
             </div>
             <p className="text-[11px] text-slate-400">
-              Pilih peran untuk menguji alur persetujuan surat
+              Sistem otomatis mengarahkan ke tampilan sesuai jabatan
             </p>
           </div>
 
-          <div className="max-h-[340px] overflow-y-auto py-1 space-y-1 scrollbar-thin">
+          <div className="max-h-[350px] overflow-y-auto py-1 space-y-1 scrollbar-thin">
             {DEMO_PERSONAS.map((persona) => {
               const isSelected = persona.id === activePersona.id;
+              const primaryAsg = persona.assignments[0];
+              const destName = destinationLabel(primaryAsg?.positionCode ?? "", persona.uiSurface);
+
               return (
                 <button
                   key={persona.id}
@@ -128,17 +140,22 @@ export function UserSwitcher() {
                         {persona.name}
                       </span>
                       {isSelected && (
-                        <span className="text-gold text-micro shrink-0">✓</span>
+                        <span className="text-gold text-micro shrink-0 font-bold">✓ Aktif</span>
                       )}
                     </div>
                     <div className="truncate text-[11px] text-slate-400 mt-0.5">
                       {persona.positionName}
                     </div>
-                    <span
-                      className={`inline-block mt-1 rounded border px-1.5 py-px text-[9.5px] font-semibold ${persona.badgeColor ?? "bg-slate-700 text-slate-200 border-slate-600"}`}
-                    >
-                      {persona.roleLabel}
-                    </span>
+                    <div className="mt-1 flex items-center justify-between gap-1">
+                      <span
+                        className={`inline-block rounded border px-1.5 py-px text-[9.5px] font-semibold ${persona.badgeColor ?? "bg-slate-700 text-slate-200 border-slate-600"}`}
+                      >
+                        {persona.roleLabel}
+                      </span>
+                      <span className="text-[10px] text-gold/80 font-medium">
+                        &rarr; {destName}
+                      </span>
+                    </div>
                   </div>
                 </button>
               );

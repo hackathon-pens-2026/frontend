@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   DashboardIcon,
   FileTextIcon,
@@ -15,28 +16,62 @@ import {
 } from "@/components/ui";
 import { useSession } from "@/lib/auth/session-provider";
 import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
+import { listMyLetters } from "@/lib/api/letters";
+import { listMyTasks } from "@/lib/api/workflow";
 import { UserSwitcher } from "./user-switcher";
 
 interface StudentSidebarProps {
   currentPath?: string;
   letterCount?: number;
+  pendingCount?: number;
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
-  return (first + second).toUpperCase();
-}
-
-export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: StudentSidebarProps) {
-  const { user, assignments, capabilities } = useSession();
+export function StudentSidebar({
+  currentPath: propPath,
+  letterCount: propLetterCount,
+  pendingCount: propPendingCount,
+}: StudentSidebarProps) {
+  const pathname = usePathname();
+  const currentPath = propPath ?? pathname ?? "/";
+  const { user, capabilities } = useSession();
   const [qrOpen, setQrOpen] = useState(false);
+  const [letterCount, setLetterCount] = useState<number | undefined>(propLetterCount);
+  const [pendingCount, setPendingCount] = useState<number | undefined>(propPendingCount);
 
-  const displayName = user?.name ?? "Memuat profil…";
-  const identityNumber = user?.nimNip ?? user?.email ?? "";
-  const primaryPosition = assignments[0]?.positionName ?? "Mahasiswa PENS";
+  useEffect(() => {
+    if (propLetterCount !== undefined) {
+      setLetterCount(propLetterCount);
+      return;
+    }
+    let active = true;
+    listMyLetters(1, 50)
+      .then((res) => {
+        if (active) setLetterCount(res.items.filter((l) => l.status !== "Completed" && l.status !== "Rejected").length);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [propLetterCount]);
+
+  useEffect(() => {
+    if (propPendingCount !== undefined) {
+      setPendingCount(propPendingCount);
+      return;
+    }
+    if (!capabilities.some((c) => c === "Signer" || c === "Approver")) return;
+    let active = true;
+    listMyTasks(1, 50)
+      .then((res) => {
+        if (active) setPendingCount(res.items.length);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [propPendingCount, capabilities]);
+
+  const canApprove = capabilities.some((capability) => capability === "Signer" || capability === "Approver");
 
   const navItems = [
     {
@@ -59,8 +94,9 @@ export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: Stu
       icon: FileTextIcon,
       badge: letterCount,
     },
-    ...(capabilities.some((capability) => capability === "Signer" || capability === "Approver")
-      ? [{ id: "inbox", label: "Persetujuan Saya", href: "/persetujuan", icon: InboxIcon }] : []),
+    ...(canApprove
+      ? [{ id: "inbox", label: "Persetujuan Saya", href: "/persetujuan", icon: InboxIcon, badge: pendingCount }]
+      : []),
   ];
 
   return (
@@ -128,9 +164,8 @@ export function StudentSidebar({ currentPath = "/surat/baru", letterCount }: Stu
       <nav className="flex flex-col gap-1.5" aria-label="Menu Mahasiswa">
         {navItems.map((item) => {
           const isActive =
-            (item.href === "/surat/baru" && currentPath === "/surat/baru") ||
-            (item.href === "/surat" && currentPath === "/surat") ||
-            (item.href === "/" && currentPath === "/");
+            currentPath === item.href ||
+            (item.href !== "/" && Boolean(currentPath?.startsWith(item.href)));
 
           return (
             <Link

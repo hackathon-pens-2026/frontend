@@ -2,25 +2,19 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { DashboardLetter, FilterStatus, NavigationItem, SummaryMetric } from "../types";
+import { DashboardLetter, FilterStatus, SummaryMetric } from "../types";
 import { SummaryCards } from "./summary-cards";
 import { AttentionSection } from "./attention-section";
 import { RecentLetters } from "./recent-letters";
 import { SignatureQrPanel } from "@/features/signature/components/signature-qr-panel";
+import { StudentSidebar } from "@/features/shell/components/student-sidebar";
 import {
-  LogoIcon,
   SearchIcon,
   PlusIcon,
-  LayoutDashboardIcon,
-  FilePlusIcon,
-  FileTextIcon,
-  QrCodeIcon,
-  ShieldCheckIcon,
   DownloadIcon,
   XIcon,
   CheckIcon,
 } from "./icons";
-import { InboxIcon } from "@/components/ui";
 import { ApiError } from "@/lib/api/errors";
 import { listMyLetters, downloadLetterDocument } from "@/lib/api/letters";
 import { getLetterWorkflow } from "@/lib/api/workflow";
@@ -212,36 +206,10 @@ export default function StudentDashboard() {
     (l) => l.status === "review" || l.status === "pending",
   ).length;
 
-  const canApprove =
-    capabilities.includes("Signer") || capabilities.includes("Approver");
-
-  const navigationMenu: NavigationItem[] = [
-    { id: "dashboard", label: "Dashboard" },
-    { id: "new-request", label: "Buat Pengajuan Baru" },
-    ...(canApprove
-      ? [{ id: "inbox", label: "Kotak Persetujuan" }]
-      : []),
-    { id: "my-letters", label: "Surat Saya", badge: activeCount },
-  ];
-
   const displayName = user?.name ?? "Memuat…";
   const displayInitials = user?.name ? initialsOf(user.name) : "…";
   const displayNumber = user?.nimNip ?? user?.email ?? "";
   const primaryPosition = user?.assignments[0]?.positionName ?? "Mahasiswa";
-
-  const renderNavIcon = (id: string) => {
-    switch (id) {
-      case "dashboard":
-        return <LayoutDashboardIcon size={18} />;
-      case "new-request":
-        return <FilePlusIcon size={18} />;
-      case "inbox":
-        return <InboxIcon className="size-[18px]" />;
-      case "my-letters":
-      default:
-        return <FileTextIcon size={18} />;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-900 font-sans relative selection:bg-blue-100">
@@ -256,107 +224,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <aside
-        aria-label="Sidebar Menu"
-        className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-[#0f172a] px-4 py-5 select-none text-white shadow-lg"
-      >
-        <div className="flex items-center gap-3 px-2">
-          <LogoIcon size={40} className="size-10 rounded-xl shadow-lift" />
-          <div className="leading-tight">
-            <div className="text-[17px] font-bold tracking-tight text-white">
-              SignIt<span className="text-amber-400 font-extrabold">!</span>
-            </div>
-            <div className="text-[11px] font-medium text-slate-400">Portal Mahasiswa</div>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <span className="flex size-[38px] items-center justify-center rounded-full bg-[#1e3a8a] text-xs font-semibold text-white">
-                {displayInitials}
-              </span>
-              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#0f172a] bg-emerald-500" />
-            </div>
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-semibold text-white">{displayName}</div>
-              <div className="text-xs text-slate-400 font-mono mt-0.5">{displayNumber}</div>
-            </div>
-          </div>
-
-          <div className="mt-2.5 flex items-center justify-between border-t border-white/5 pt-2">
-            <span className="text-[11px] text-slate-400 truncate max-w-[120px]">
-              {primaryPosition}
-            </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-300">
-              <ShieldCheckIcon size={11} className="text-emerald-400" />
-              Sesi Aktif
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-6 px-3 pb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-          Menu Navigasi
-        </div>
-        <nav className="flex flex-col gap-1" aria-label="Menu Utama">
-          {navigationMenu.map((item) => {
-            const isActive = item.id === "dashboard";
-            const baseClass = `relative flex h-10 items-center gap-3 rounded-lg px-3 text-xs font-medium transition-colors cursor-pointer text-left ${
-              isActive
-                ? "bg-white/10 text-white font-semibold"
-                : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
-            }`;
-            if (item.id !== "dashboard") {
-              const href =
-                item.id === "inbox"
-                  ? "/persetujuan"
-                  : item.id === "my-letters"
-                  ? "/surat"
-                  : "/surat/baru";
-              return (
-                <Link key={item.id} href={href} className={baseClass}>
-                  <span className="text-slate-400">{renderNavIcon(item.id)}</span>
-                  <span className="flex-1 truncate">{item.label}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span className="rounded-full bg-[#1e3a8a] px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums leading-none">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            }
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={baseClass}
-              >
-                {isActive && (
-                  <span className="absolute top-1.5 bottom-1.5 -left-4 w-1 rounded-r-full bg-[#1e3a8a]" />
-                )}
-                <span className={isActive ? "text-white" : "text-slate-400"}>
-                  {renderNavIcon(item.id)}
-                </span>
-                <span className="flex-1 truncate">{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <button
-          type="button"
-          onClick={() => setQrOpen(true)}
-          className="mt-auto block rounded-xl border border-white/10 bg-slate-800/60 p-4 text-left transition hover:border-slate-600 cursor-pointer"
-        >
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <QrCodeIcon size={16} className="text-emerald-400" />
-            <span>QR Tanda Tangan Saya</span>
-          </div>
-          <p className="mt-1.5 text-xs text-slate-400 leading-relaxed">
-            QR dibuat otomatis oleh server untuk setiap tanda tangan yang sah.
-          </p>
-        </button>
-      </aside>
+      <StudentSidebar currentPath="/" letterCount={activeCount} />
 
       <div className="pl-[260px] min-h-screen flex flex-col bg-[#f8fafc]">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-slate-200 bg-white px-8 shadow-xs">

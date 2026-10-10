@@ -14,6 +14,7 @@ import { DelegationView } from "@/features/delegation/components/delegation-view
 import { ApiError } from "@/lib/api/errors";
 import { listMyLetters } from "@/lib/api/letters";
 import { getLetterWorkflow, listMyTasks } from "@/lib/api/workflow";
+import { useSession } from "@/lib/auth/session-provider";
 import type { LetterSummaryDto, WorkflowTaskDto } from "@/lib/api/types";
 
 function describeError(cause: unknown) {
@@ -24,7 +25,19 @@ function describeError(cause: unknown) {
 
 export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }) {
   const router = useRouter();
-  const [view, setView] = useState<NavView>(studentInbox ? "inbox" : "dashboard");
+  const { user, uiSurface, userCategory } = useSession();
+  const isStudent =
+    studentInbox ||
+    uiSurface === "Student" ||
+    userCategory === "StudentDagri" ||
+    userCategory === "StudentGeneral";
+  const [view, setView] = useState<NavView>(studentInbox || isStudent ? "inbox" : "dashboard");
+
+  useEffect(() => {
+    if (isStudent && view === "dashboard") {
+      setView("inbox");
+    }
+  }, [isStudent, view]);
   const [tasks, setTasks] = useState<WorkflowTaskDto[]>([]);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [tasksError, setTasksError] = useState<string | null>(null);
@@ -130,11 +143,15 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
 
   return (
     <div className="min-h-screen min-w-[1280px] bg-canvas text-midnight">
-      {studentInbox ? <StudentSidebar currentPath="/persetujuan" /> : <StaffSidebar
-        view={view}
-        onChange={setView}
-        pendingCount={pendingCount}
-      />}
+      {isStudent ? (
+        <StudentSidebar currentPath="/persetujuan" pendingCount={pendingCount} />
+      ) : (
+        <StaffSidebar
+          view={view}
+          onChange={setView}
+          pendingCount={pendingCount}
+        />
+      )}
 
       <div className="pl-[260px]">
         <StaffHeader

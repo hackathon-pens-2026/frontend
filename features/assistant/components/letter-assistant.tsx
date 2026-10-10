@@ -1219,11 +1219,27 @@ export function LetterAssistant() {
             onSubmit={() => void submit()}
             onOpenPreview={() => {
               if (draft && preview?.reviewDocumentId) {
-                window.open(
-                  `/api/v1/letters/${draft.id}/documents/${preview.reviewDocumentId}`,
-                  "_blank",
-                  "noopener",
-                );
+                const searchParams = new URLSearchParams();
+                if (draft.title) searchParams.set("title", draft.title);
+                if (draft.typeId) searchParams.set("typeId", draft.typeId);
+                if (organizationLabel?.name) searchParams.set("org", organizationLabel.name);
+                if (committeeLabel?.name) searchParams.set("ketupel", committeeLabel.name);
+                if (organizationChairLabel?.name) searchParams.set("ketua", organizationChairLabel.name);
+                if (fields["nama_kegiatan"]) searchParams.set("activity", fields["nama_kegiatan"]);
+                if (fields["deskripsi"]) searchParams.set("desc", fields["deskripsi"]);
+                if (fields["tanggal_mulai"] || fields["hari_tanggal_kegiatan"]) {
+                  searchParams.set("date", fields["hari_tanggal_kegiatan"] || fields["tanggal_mulai"]);
+                }
+                if (fields["lokasi"] || fields["ruangan_kegiatan"] || resourceLabel?.code) {
+                  searchParams.set(
+                    "location",
+                    fields["ruangan_kegiatan"] || fields["lokasi"] || resourceLabel?.code || "",
+                  );
+                }
+
+                const queryStr = searchParams.toString();
+                const url = `/api/v1/letters/${draft.id}/documents/${preview.reviewDocumentId}${queryStr ? `?${queryStr}` : ""}`;
+                window.open(url, "_blank", "noopener");
               }
             }}
           />

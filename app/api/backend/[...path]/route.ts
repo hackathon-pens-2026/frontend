@@ -1,9 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
+import { renderLetterHtml } from "@/lib/server/preview-template";
 
 type Context = { params: Promise<{ path: string[] }> };
 
 async function forward(request: NextRequest, context: Context) {
   const { path } = await context.params;
+
+  if (path[0] === "letters" && path.length >= 4 && path[2] === "documents" && (path[1].startsWith("draft-sim-") || path[3].startsWith("doc-sim-"))) {
+    const searchParams = request.nextUrl.searchParams;
+    const html = renderLetterHtml({
+      letterId: path[1],
+      documentId: path[3],
+      title: searchParams.get("title") ?? undefined,
+      typeId: searchParams.get("typeId") ?? undefined,
+      org: searchParams.get("org") ?? undefined,
+      ketupel: searchParams.get("ketupel") ?? undefined,
+      ketua: searchParams.get("ketua") ?? undefined,
+      activity: searchParams.get("activity") ?? undefined,
+      desc: searchParams.get("desc") ?? undefined,
+      date: searchParams.get("date") ?? undefined,
+      location: searchParams.get("location") ?? undefined,
+    });
+    return new Response(html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+
   if (path.some((part) => !/^[a-zA-Z0-9_-]+$/.test(part)) || !["auth", "me", "templates", "letters", "routing", "workflow", "tasks", "rooms"].includes(path[0])) {
     return NextResponse.json({ detail: "Endpoint tidak tersedia." }, { status: 404 });
   }

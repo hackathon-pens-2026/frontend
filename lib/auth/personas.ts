@@ -15,6 +15,11 @@ export interface DemoPersona {
 }
 
 export const DEMO_PERSONAS: DemoPersona[] = [
+  { id: "pengaju-organisasi", name: "UAT Pengaju Organisasi", roleLabel: "Mahasiswa / Pengaju", positionName: "Pengaju Organisasi", email: "uat.pengaju-organisasi@demo.signit.example", nimNip: "", userCategory: "StudentGeneral", uiSurface: "Student", capabilities: [], assignments: [] },
+  { id: "minat-bakat", name: "UAT Tim Pembina Minat dan Bakat", roleLabel: "Manajemen", positionName: "Tim Pembina Minat dan Bakat", email: "uat.minat-bakat@demo.signit.example", nimNip: "", userCategory: "Management", uiSurface: "Management", capabilities: [], assignments: [] },
+  { id: "wadir2", name: "UAT Wakil Direktur II", roleLabel: "Manajemen", positionName: "Wakil Direktur II", email: "uat.wadir2@demo.signit.example", nimNip: "", userCategory: "Management", uiSurface: "Management", capabilities: [], assignments: [] },
+  { id: "ketupel-pengganti", name: "UAT Ketua Pelaksana Pengganti", roleLabel: "Penerima Delegasi", positionName: "Ketua Pelaksana", email: "uat.ketupel-pengganti@demo.signit.example", nimNip: "", userCategory: "StudentGeneral", uiSurface: "Student", capabilities: [], assignments: [] },
+  { id: "ketua-pengganti", name: "UAT Ketua Organisasi Pengganti", roleLabel: "Penerima Delegasi", positionName: "Ketua Organisasi", email: "uat.ketua-pengganti@demo.signit.example", nimNip: "", userCategory: "StudentGeneral", uiSurface: "Student", capabilities: [], assignments: [] },
   {
     id: "pengaju",
     name: "Ahmad Zaki",

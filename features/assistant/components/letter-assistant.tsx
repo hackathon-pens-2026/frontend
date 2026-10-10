@@ -36,7 +36,6 @@ import {
 } from "@/lib/api/routing";
 import { listTemplates } from "@/lib/api/templates";
 import { useSession } from "@/lib/auth/session-provider";
-import { detectTemplate, extractFieldsFromText } from "@/lib/assistant/nlp-parser";
 import type {
   DraftDto,
   LetterPreviewDto,
@@ -318,7 +317,7 @@ function LetterAssistantContent() {
         } catch {
           setIsBotThinking(false);
           addMessage(
-            `Template **${next.name}** telah dipilih! 📋\n\nSilakan sebutkan nama kegiatan, tanggal, dan rincian permohonan Anda, atau lengkapi data melalui formulir ringkasan draf di samping kanan.`,
+            `Template **${next.name}** dipilih. Asisten backend belum merespons; lengkapi formulir dan simpan draft ke server.`,
             "bot",
           );
         }
@@ -624,124 +623,11 @@ function LetterAssistantContent() {
           return;
         } catch {
           setIsBotThinking(false);
-          // Meluncur ke NLP local fallback di bawah bila backend gagal
+          // Keep the typed message visible; do not simulate a backend response.
         }
       }
 
-      // 2. Resilient NLP Parser & Local Orchestration Fallback
-      // Kasus A: Template belum dipilih sama sekali
-      if (!template) {
-        const matched = detectTemplate(raw, templates);
-        if (matched) {
-          await selectTemplate(matched);
-
-          // Cek apakah prompt pertama pengguna sudah mengandung rincian acara/tanggal
-          const userFieldsForMatched = matched.fields.filter(
-            (f) => f.valueSource === "user",
-          );
-          const nlp = extractFieldsFromText(
-            raw,
-            userFieldsForMatched,
-            matched.typeId,
-          );
-          if (nlp.appliedLabels.length > 0) {
-            setFields((prev) => ({ ...prev, ...nlp.extractedFields }));
-            setDirty(true);
-            if (nlp.recognizedFacility && nlp.recognizedResource) {
-              setFacilityId(nlp.recognizedFacility);
-              setResourceId(nlp.recognizedResource);
-            }
-            const summary = nlp.appliedLabels
-              .map((lbl) => `• **${lbl}**`)
-              .join("\n");
-            addMessage(
-              `✅ **Data awal berhasil dicatat:**\n${summary}\n\nPeriksa panel sebelah kanan untuk melihat draf yang telah terisi.`,
-              "bot",
-              "success",
-            );
-          }
-          return;
-        }
-
-        addMessage(
-          "Silakan pilih salah satu opsi template resmi di atas:\n• **Surat Permohonan Peminjaman Ruangan**\n• **Surat Permohonan Peminjaman Alat / Barang**\n• **Proposal Kegiatan**\n• **Laporan Pertanggungjawaban (LPJ)**\n\nAtau ketik langsung permohonan Anda (contoh: *\"Saya mau pinjam ruang Teater D4 untuk seminar\"*).",
-          "bot",
-        );
-        return;
-      }
-
-      // Kasus B: Pengguna meminta ganti template saat template sudah aktif
-      const switchCandidate = detectTemplate(raw, templates);
-      if (
-        switchCandidate &&
-        switchCandidate.typeId !== template.typeId &&
-        (raw.toLowerCase().startsWith("ganti") ||
-          raw.toLowerCase().startsWith("pindah") ||
-          raw.toLowerCase().startsWith("buat") ||
-          raw.toLowerCase().includes("ke "))
-      ) {
-        await selectTemplate(switchCandidate);
-        return;
-      }
-
-      // Kasus C: Ekstraksi field atau penanganan kelengkapan data
-      const nlp = extractFieldsFromText(raw, userFields, template.typeId);
-
-      // Cek pertanyaan tentang kelengkapan field
-      if (nlp.isQuestionAboutMissing) {
-        if (missingRequired.length === 0) {
-          addMessage(
-            `🎉 Semua data wajib untuk template **${template.name}** sudah lengkap! Anda dapat meninjau pratinjau PDF di panel kanan sebelum mengajukan.`,
-            "bot",
-            "success",
-          );
-        } else {
-          const missingList = missingRequired
-            .slice(0, 5)
-            .map((f) => `• **${f.label}**`)
-            .join("\n");
-          addMessage(
-            `📋 **Data yang masih perlu dilengkapi (${missingRequired.length} field tersisa):**\n${missingList}\n\nSilakan ketik data di atas atau lengkapi langsung di panel formulir sebelah kanan.`,
-            "bot",
-          );
-        }
-        return;
-      }
-
-      // Jika ada field yang berhasil diekstrak
-      if (nlp.appliedLabels.length > 0) {
-        setFields((prev) => ({ ...prev, ...nlp.extractedFields }));
-        setDirty(true);
-
-        if (nlp.recognizedFacility && nlp.recognizedResource) {
-          setFacilityId(nlp.recognizedFacility);
-          setResourceId(nlp.recognizedResource);
-        }
-
-        const summary = nlp.appliedLabels
-          .map((lbl) => `• **${lbl}**`)
-          .join("\n");
-        const remaining = missingRequired.filter(
-          (m) => !nlp.appliedLabels.includes(m.label),
-        ).length;
-
-        addMessage(
-          `✅ **Data berikut berhasil dicatat ke draf:**\n${summary}\n\n${
-            remaining > 0
-              ? `Masih ada **${remaining} data wajib** yang perlu dilengkapi.`
-              : "Semua data wajib telah lengkap! Siap untuk diproses."
-          }`,
-          "bot",
-          "success",
-        );
-        return;
-      }
-
-      // Catatan teks umum
-      addMessage(
-        `**Catatan di halaman ini:**\n${raw}\n\n**Tips pengisian**\nKetik detail berikut pada baris terpisah:\n• Nama kegiatan: Workshop Cloud Computing\n• Tanggal: 28 Oktober 2026\n• Waktu: 08.00–15.00\n• Ruangan: Ruang Teater D4`,
-        "bot",
-      );
+      addMessage("Asisten backend belum tersedia. Pesan belum disimpan sebagai draft. Isi atau koreksi data melalui formulir, lalu simpan draft ke server.", "bot", "error");
     },
     [
       input,
@@ -750,9 +636,6 @@ function LetterAssistantContent() {
       isBackendConnected,
       template,
       templates,
-      userFields,
-      missingRequired,
-      selectTemplate,
       addMessage,
     ],
   );

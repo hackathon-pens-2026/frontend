@@ -7,7 +7,7 @@ import { AttentionSection } from "./attention-section";
 import { RecentLetters } from "./recent-letters";
 import { SubmissionSearch } from "@/features/shell/components/submission-search";
 import { ApiError } from "@/lib/api/errors";
-import { downloadLetterDocument, listMyLetters } from "@/lib/api/letters";
+import { downloadFinalLetter, listMyLetters } from "@/lib/api/letters";
 import { saveBlob } from "@/lib/display/download";
 import { toDashboardLetter } from "../adapters";
 import { DashboardLetter, FilterStatus } from "../types";
@@ -72,7 +72,7 @@ export function LettersPage() {
         return;
       }
       try {
-        const blob = await downloadLetterDocument(letter.id, letter.finalDocumentId);
+        const blob = await downloadFinalLetter(letter.id);
         saveBlob(blob, `${letter.no.replace(/[/\\]/g, "-")}.pdf`);
         showNotification(`Dokumen ${letter.no}.pdf berhasil diunduh.`);
       } catch (cause) {

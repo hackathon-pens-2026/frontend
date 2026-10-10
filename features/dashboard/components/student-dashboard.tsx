@@ -14,7 +14,7 @@ import {
   CheckIcon,
 } from "./icons";
 import { ApiError } from "@/lib/api/errors";
-import { listMyLetters, downloadLetterDocument } from "@/lib/api/letters";
+import { listMyLetters, downloadFinalLetter } from "@/lib/api/letters";
 import { getLetterWorkflow } from "@/lib/api/workflow";
 import { formatDateTime, taskStatusToBadge } from "@/lib/display/letter";
 import { saveBlob } from "@/lib/display/download";
@@ -132,7 +132,7 @@ export default function StudentDashboard() {
         return;
       }
       try {
-        const blob = await downloadLetterDocument(letter.id, letter.finalDocumentId);
+        const blob = await downloadFinalLetter(letter.id);
         saveBlob(blob, `${letter.no.replace(/[/\\]/g, "-")}.pdf`);
         showNotification(`Dokumen ${letter.no}.pdf berhasil diunduh.`);
       } catch (cause) {

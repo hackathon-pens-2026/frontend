@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { AuditLogItem, TimelineStage, TrackingDetailData } from "../types";
 import { HeaderBanner } from "./header-banner";
 import { BureaucracyTimeline } from "./bureaucracy-timeline";
 import { DocumentSummaryCard } from "./document-summary-card";
 import { AuditTrailCard } from "./audit-trail-card";
 import { ApiError } from "@/lib/api/errors";
-import { downloadLetterDocument, getLetter } from "@/lib/api/letters";
+import { apiDownload } from "@/lib/api/client";
+import { downloadFinalLetter, getLetter } from "@/lib/api/letters";
 import { getLetterWorkflow } from "@/lib/api/workflow";
 import {
   formatDate,
@@ -18,7 +18,8 @@ import {
   taskStatusToBadge,
 } from "@/lib/display/letter";
 import { saveBlob } from "@/lib/display/download";
-import type { WorkflowTaskDto } from "@/lib/api/types";
+import type { WorkflowTaskDto, LetterWorkflowDto } from "@/lib/api/types";
+import { LetterActions } from "./letter-actions";
 import { SignedLetterPreview } from "@/features/signatures/signed-letter-preview";
 
 interface TrackingDetailProps {
@@ -144,12 +145,21 @@ export function TrackingDetail({
   const [documentId, setDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [workflowSnapshot, setWorkflowSnapshot] = useState<LetterWorkflowDto | null>(null);
+  const [owner, setOwner] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getLetterWorkflow(letterId), getLetter(letterId)])
+    Promise.all([getLetterWorkflow(letterId), getLetter(letterId).catch((cause: unknown) => {
+      if (cause instanceof ApiError && cause.status === 404) return null;
+      throw cause;
+    })])
       .then(([workflow, draft]) => {
         if (!active) return;
+        setError(null);
+        setOwner(draft !== null);
+        setWorkflowSnapshot(workflow);
         setDocumentId(workflow.finalDocumentId);
         const now = Date.now();
         const tasks = [...workflow.tasks].sort((a, b) => a.order - b.order);
@@ -161,7 +171,7 @@ export function TrackingDetail({
         const firstTask = tasks[0];
         let values: Record<string, string> = {};
         try {
-          values = JSON.parse(draft.dataJson) as Record<string, string>;
+          values = JSON.parse(draft?.dataJson ?? "{}") as Record<string, string>;
         } catch {
           values = {};
         }
@@ -173,9 +183,9 @@ export function TrackingDetail({
         }
         const organization = firstTask?.organizationName ?? "-";
         setData({
-          letterNumber: workflow.number || draft.title,
-          title: firstTask?.title ?? draft.title,
-          categoryTitle: letterTypeLabel(draft.typeId || firstTask?.typeId || ""),
+          letterNumber: workflow.number || draft?.title || firstTask?.title || "Surat",
+          title: firstTask?.title ?? draft?.title ?? "Surat",
+          categoryTitle: letterTypeLabel(draft?.typeId || firstTask?.typeId || ""),
           organization,
           submittedAt: firstTask?.activatedAt
             ? formatDateTime(firstTask.activatedAt)
@@ -189,13 +199,13 @@ export function TrackingDetail({
             : "-",
           stages: tasks.map((task) => toStage(task, now)),
           summary: {
-            type: letterTypeLabel(draft.typeId),
+            type: letterTypeLabel(draft?.typeId || firstTask?.typeId || ""),
             room: values["ruangan_kegiatan"] ?? "-",
             useTime:
               [values["hari_tanggal_kegiatan"], values["waktu_kegiatan"]]
                 .filter(Boolean)
                 .join(" · ") || "-",
-            activity: values["nama_kegiatan"] || draft.title,
+            activity: values["nama_kegiatan"] || draft?.title || firstTask?.title || "-",
             attachments: [],
           },
           auditTrail: workflow.timeline.map((entry) =>
@@ -220,13 +230,13 @@ export function TrackingDetail({
     return () => {
       active = false;
     };
-  }, [letterId]);
+  }, [letterId, reload]);
 
   const handleDownloadDocument = useCallback(async () => {
     if (!data || !documentId) return;
     setDownloading(true);
     try {
-      const blob = await downloadLetterDocument(letterId, documentId);
+      const blob = owner ? await downloadFinalLetter(letterId) : await apiDownload(`/letters/${letterId}/signed-document`);
       saveBlob(blob, `${data.letterNumber.replace(/[/\\]/g, "-")}.pdf`);
       onShowNotification?.("Dokumen final berhasil diunduh.");
     } catch (cause) {
@@ -236,7 +246,7 @@ export function TrackingDetail({
     } finally {
       setDownloading(false);
     }
-  }, [data, documentId, letterId, onShowNotification]);
+  }, [data, documentId, letterId, onShowNotification, owner]);
 
   if (error) {
     return (
@@ -283,11 +293,8 @@ export function TrackingDetail({
         onDownloadDraft={() => void handleDownloadDocument()}
       />
 
-      {data.totalStages > 0 && <SignedLetterPreview key={letterId} letterId={letterId} refresh={0} />}
-      {data.totalStages === 0 && <section className="rounded-xl border border-line bg-surface p-5 text-midnight">
-        <p className="text-body">Draft belum diajukan. Buka formulir untuk menyiapkan PDF dari template backend, lalu tinjau sebelum mengajukan.</p>
-        <Link href={`/surat/baru?draftId=${letterId}`} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-navy px-4 text-surface">Edit / Tinjau Draft</Link>
-      </section>}
+      {data.totalStages > 0 && <SignedLetterPreview key={`${letterId}:${reload}`} letterId={letterId} refresh={reload} />}
+      {workflowSnapshot && <LetterActions key={`${workflowSnapshot.version}:${reload}`} workflow={workflowSnapshot} owner={owner} onChanged={() => setReload((value) => value + 1)} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-7 xl:col-span-7 space-y-6">

@@ -13,6 +13,7 @@ export function SignedLetterPreview({ letterId, refresh }: { letterId: string; r
     apiDownload(`/letters/${letterId}/signed-document`, controller.signal).then((blob) => {
       if (controller.signal.aborted) return;
       objectUrl = URL.createObjectURL(blob);
+      setError("");
       setUrl(objectUrl);
     }).catch((failure: unknown) => {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "PDF gagal dimuat.");

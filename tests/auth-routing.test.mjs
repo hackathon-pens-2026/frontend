@@ -21,7 +21,7 @@ test("four categories route to exactly two surfaces, with a student task inbox",
   ]) {
     const user = { userCategory, uiSurface, capabilities: ["Requester", "Approver"] };
     assert.equal(postLoginPath(user, null), expected);
-    assert.equal(postLoginPath(user, "/manajemen"), expected);
+    assert.equal(postLoginPath(user, "/manajemen"), uiSurface === "Student" ? "/persetujuan" : expected);
     assert.equal(postLoginPath(user, "/staff"), uiSurface === "Student" ? "/persetujuan" : "/manajemen");
   }
 });

@@ -67,6 +67,7 @@ export function StudentSidebar({
   const canApprove = capabilities.some((capability) => capability === "Signer" || capability === "Approver");
 
   const navItems = [
+    { id: "rooms", label: "Jadwal Fasilitas", href: "/ruangan", icon: FileTextIcon },
     {
       id: "dashboard",
       label: "Dasbor Beranda",

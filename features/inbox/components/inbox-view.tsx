@@ -113,7 +113,7 @@ export function InboxView({
   );
 
   const handlePrimary = async () => {
-    if (!selectedLetter || !primaryAction) return;
+    if (!selectedLetter || !primaryAction || submitting) return;
     const task = selectedLetter.task;
     setSubmitting(true);
     try {
@@ -147,17 +147,20 @@ export function InboxView({
   };
 
   const handleMutation = async (
-    action: "request-revision" | "reject" | "defer" | "delegate",
+    action: "request-revision" | "reject" | "defer" | "delegate" | "resume" | "revoke-delegation",
     reason: string,
     options: { until?: string; delegateUserId?: string } = {},
   ) => {
-    if (!selectedLetter) return;
+    if (!selectedLetter || submitting) return;
     const task = selectedLetter.task;
+    setSubmitting(true);
     const messages = {
-      "request-revision": "Permintaan revisi dikirim ke pemohon via email",
-      reject: "Surat ditolak · alasan dikirim ke pemohon via email",
+      "request-revision": "Permintaan revisi tercatat; email diproses backend",
+      reject: "Penolakan tercatat; email diproses backend",
       defer: "Tugas ditunda sesuai batas waktu baru",
       delegate: "Mandat delegasi aktif untuk tugas ini",
+      resume: "Tugas dilanjutkan",
+      "revoke-delegation": "Mandat delegasi dicabut",
     };
     try {
       await mutateTask(
@@ -176,6 +179,7 @@ export function InboxView({
       showToast(messages[action]);
       setModalMode(null);
       setDelegateOpen(false);
+      await onRefresh();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         showToast("Akses akun backend kedaluwarsa. Pilih ulang akun; tindakan belum berhasil.");
@@ -366,100 +370,7 @@ export function InboxView({
                     className="h-full w-full rounded-lg border border-line bg-white shadow-sm"
                   />
                 ) : (
-                  <div className="h-full w-full rounded-lg border border-line bg-white shadow-sm p-6 overflow-y-auto scroll-thin flex flex-col justify-between text-midnight">
-                    <div>
-                      {/* Letterhead */}
-                      <div className="border-b-2 border-midnight/80 pb-3 text-center">
-                        <div className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">
-                          Kementerian Pendidikan Tinggi, Sains, dan Teknologi
-                        </div>
-                        <div className="text-xs font-bold text-midnight uppercase tracking-wide mt-0.5">
-                          Politeknik Elektronika Negeri Surabaya
-                        </div>
-                        <div className="text-[11px] font-semibold text-navy">
-                          {selectedLetter.unit || "Organisasi Kemahasiswaan"}
-                        </div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">
-                          Jl. Raya ITS Sukolilo, Surabaya 60111 · Telp: (031) 5947280
-                        </div>
-                      </div>
-
-                      {/* Metadata */}
-                      <div className="mt-4 grid grid-cols-2 text-micro">
-                        <div className="space-y-1">
-                          <div>
-                            <span className="text-slate-400">Nomor:</span>{" "}
-                            <span className="font-semibold text-midnight">
-                              {selectedLetter.number}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">Lampiran:</span>{" "}
-                            <span className="text-midnight">1 (satu) Berkas</span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400">Perihal:</span>{" "}
-                            <span className="font-semibold text-midnight">
-                              {selectedLetter.title}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right text-slate-500">
-                          Surabaya, {selectedLetter.submitted}
-                        </div>
-                      </div>
-
-                      {/* Salutation & Body */}
-                      <div className="mt-5 text-micro leading-relaxed text-slate-700 space-y-2.5">
-                        <p>
-                          Kepada Yth.
-                          <br />
-                          <strong className="text-midnight">
-                            {selectedLetter.stage}
-                          </strong>
-                          <br />
-                          Di tempat
-                        </p>
-                        <p>Dengan hormat,</p>
-                        <p>
-                          Sehubungan dengan permohonan pengesahan dokumen yang diajukan oleh{" "}
-                          <strong className="text-midnight">
-                            {selectedLetter.applicant}
-                          </strong>{" "}
-                          ({selectedLetter.unit}), bersama surat ini kami mengajukan{" "}
-                          <strong className="text-midnight">
-                            {selectedLetter.title}
-                          </strong>{" "}
-                          untuk ditinjau dan ditandatangani sesuai dengan alur otorisasi resmi Politeknik Elektronika Negeri Surabaya.
-                        </p>
-                        <p>
-                          Demikian surat pengajuan ini kami sampaikan. Atas perhatian, arahan, dan perkenan Saudara, kami mengucapkan terima kasih.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Signature block */}
-                    <div className="mt-6 pt-4 border-t border-dashed border-line">
-                      <div className="flex justify-between items-end text-micro">
-                        <div className="text-slate-500">
-                          <div>Status Dokumen:</div>
-                          <span className="inline-flex items-center gap-1.5 font-semibold text-navy">
-                            <span className="size-2 rounded-full bg-navy animate-pulse" />
-                            Menunggu Tindakan Anda
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-slate-500">Pemberi Otorisasi:</div>
-                          <div className="font-bold text-midnight">
-                            {selectedLetter.task.assignedUserName || selectedLetter.stage}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {selectedLetter.stage}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <p role="status" className="rounded-lg border border-line bg-surface p-5 text-midnight">PDF tinjauan belum tersedia. Tidak ada dokumen pengganti yang dibuat frontend.</p>
                 )}
               </div>
             </Card>
@@ -580,11 +491,9 @@ export function InboxView({
                         Delegasikan Tugas
                       </Button>
                     )}
+                    {selectedLetter.allowedActions.includes("resume") && <Button disabled={submitting} onClick={() => void handleMutation("resume", "Melanjutkan tugas melalui aplikasi")}>Lanjutkan Tugas</Button>}
                     {selectedLetter.allowedActions.includes("revoke-delegation") && (
-                      <p className="rounded-lg bg-delegate-bg px-3 py-2 text-micro text-violet-800">
-                        Mandat aktif pada tugas ini. Penerima mandat dapat
-                        bertindak atas nama Anda hingga batas waktu.
-                      </p>
+                      <Button disabled={submitting} onClick={() => void handleMutation("revoke-delegation", "Mencabut mandat melalui aplikasi")}>Cabut Delegasi</Button>
                     )}
                   </div>
                 ) : (

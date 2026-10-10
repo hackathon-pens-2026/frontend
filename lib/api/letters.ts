@@ -83,3 +83,7 @@ export function downloadLetterDocument(
 ): Promise<Blob> {
   return apiDownload(`/letters/${letterId}/documents/${documentId}`);
 }
+
+export function downloadFinalLetter(letterId: string): Promise<Blob> {
+  return apiDownload(`/letters/${letterId}/finalization/document`);
+}

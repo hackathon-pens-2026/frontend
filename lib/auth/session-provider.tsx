@@ -2,8 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api/client";
-import { logoutAction } from "@/lib/auth/actions";
+import { apiFetch, UNAUTHORIZED_EVENT } from "@/lib/api/client";
 import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
 import { destinationByPosition, routeRedirect } from "./routing";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
@@ -87,7 +86,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Redirect away from /login if user is in demo mode
+  useEffect(() => {
+    const expire = () => {
+      setSelectionError("Akses backend berubah atau kedaluwarsa. Pilih akun kembali.");
+      setStatus("unauthenticated");
+    };
+    const changed = (event: StorageEvent) => {
+      if (event.key === "signit_active_persona") expire();
+    };
+    window.addEventListener(UNAUTHORIZED_EVENT, expire);
+    window.addEventListener("storage", changed);
+    return () => {
+      window.removeEventListener(UNAUTHORIZED_EVENT, expire);
+      window.removeEventListener("storage", changed);
+    };
+  }, []);
+
+  // The UAT account picker replaces the email/password screen.
   useEffect(() => {
     if (pathname === "/login") {
       router.replace("/");
@@ -110,6 +125,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!target) return;
 
       if (!accessKey) {
+        setCurrentPersonaId(target.id);
         setSelectionError("Masukkan kode akses UAT untuk mengganti akun backend.");
         setStatus("unauthenticated");
         return;
@@ -147,7 +163,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
 
       // Auto-navigate to the optimal destination according to the new position
-      const destination = destinationByPosition(newPos.positionCode, target.uiSurface);
+      const destination = destinationByPosition(newPos.positionCode, dto.uiSurface);
       if (destination && destination !== pathname) {
         router.push(destination);
       }
@@ -180,13 +196,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    switchUser("pengaju");
     try {
-      await logoutAction();
-    } catch {
-      // Ignore
+      await apiFetch("/auth/logout", { method: "POST", skipUnauthorizedEvent: true });
+    } finally {
+      setAccessKey("");
+      setStatus("unauthenticated");
     }
-  }, [switchUser]);
+  }, []);
 
   const value = useMemo<SessionValue>(
     () => ({

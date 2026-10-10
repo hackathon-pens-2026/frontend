@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { NavView } from "../types";
 import {
   DashboardIcon,
@@ -68,6 +69,7 @@ export function StaffSidebar({
         Menu Utama
       </div>
       <nav className="flex flex-col gap-1">
+        <Link href="/ruangan" className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-body text-surface">Jadwal Fasilitas</Link>
         {navItems.map(({ id, label, icon: Icon, badge }) => {
           const isActive = view === id;
           return (

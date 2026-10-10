@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
@@ -40,6 +41,8 @@ interface DraftSummaryProps {
   onGeneratePreview: () => void;
   onSubmit: () => void;
   onOpenPreview: () => void;
+  isDemo?: boolean;
+  reviewHref?: string | null;
 }
 
 function prettifyGroup(group: string): string {
@@ -69,6 +72,8 @@ export function DraftSummary({
   onGeneratePreview,
   onSubmit,
   onOpenPreview,
+  isDemo = false,
+  reviewHref = null,
 }: DraftSummaryProps) {
   const userFields = template?.fields.filter((f) => f.valueSource === "user") ?? [];
   const missing = userFields.filter(
@@ -149,6 +154,7 @@ export function DraftSummary({
                       value={fields[field.key] ?? ""}
                       onChange={(event) => onFieldChange(field.key, event.target.value)}
                       rows={2}
+                      disabled={status !== "idle"}
                       placeholder={field.label}
                       className="w-full resize-none rounded-lg border border-line bg-white px-3 py-2 text-body text-midnight outline-none focus:border-navy focus:ring-4 focus:ring-navy/10"
                     />
@@ -185,7 +191,7 @@ export function DraftSummary({
         {draftSavedAt && (
           <p className="flex items-center gap-1.5 text-micro text-slate-500">
             <ClockIcon className="size-3.5" />
-            Draf tersimpan di server · {draftSavedAt}
+            {isDemo ? "Draft tersimpan di browser" : "Draf tersimpan di server"} · {draftSavedAt}
           </p>
         )}
 
@@ -193,8 +199,11 @@ export function DraftSummary({
           <section className="rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3">
             <div className="flex items-center gap-2 text-micro font-semibold text-emerald-800">
               <CheckIcon className="size-4" />
-              <span>Pratinjau PDF siap ditinjau</span>
+              <span>{isDemo ? "Tinjauan demo siap" : "Pratinjau PDF siap ditinjau"}</span>
             </div>
+            {reviewHref ? (
+              <Link href={reviewHref} className="mt-2 inline-flex min-h-10 items-center text-body font-semibold text-navy hover:underline focus-visible:outline-2 focus-visible:outline-navy">Tinjau Surat →</Link>
+            ) : (
             <button
               type="button"
               onClick={onOpenPreview}
@@ -202,24 +211,27 @@ export function DraftSummary({
             >
               Buka pratinjau PDF di tab baru
             </button>
+            )}
+            {isDemo && <p className="mt-1 text-micro text-midnight">Tersimpan untuk akun yang dipilih pada browser ini, bukan PDF resmi.</p>}
+            {!isDemo && preview.downloadUrl && <iframe title="Pratinjau template surat" src={preview.downloadUrl} className="mt-3 h-[32rem] w-full rounded-lg border border-line bg-surface" />}
           </section>
         )}
 
         {submittedNumber && (
           <section className="rounded-lg border border-approved-border bg-approved-bg px-3.5 py-3">
             <div className="text-micro font-semibold text-approved">
-              Surat berhasil diajukan
+              {isDemo ? "Pengajuan demo tersimpan" : "Surat berhasil diajukan"}
             </div>
             <div className="mt-0.5 font-mono text-body font-semibold text-midnight">
               {submittedNumber}
             </div>
             {submittedLetterId && (
-              <a
+              <Link
                 href={`/surat/${submittedLetterId}`}
                 className="mt-1.5 inline-flex text-micro font-semibold text-navy hover:underline"
               >
                 Buka halaman surat →
-              </a>
+              </Link>
             )}
           </section>
         )}
@@ -233,7 +245,7 @@ export function DraftSummary({
           className="w-full flex h-11 items-center justify-center gap-2 rounded-lg border border-line bg-white text-body font-semibold text-midnight shadow-card hover:bg-slate-50 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           <ShieldCheckIcon className="size-4" />
-          <span>{status === "saving" ? "Menyimpan draf…" : "Simpan Draf ke Server"}</span>
+          <span>{status === "saving" ? "Menyimpan draft…" : isDemo ? "Simpan Draft" : "Simpan Draf ke Server"}</span>
         </button>
 
         <button
@@ -244,7 +256,7 @@ export function DraftSummary({
         >
           <SparklesIcon className="size-4" />
           <span>
-            {status === "previewing" ? "Menyusun pratinjau…" : "Generate Pratinjau PDF"}
+            {status === "previewing" ? "Menyiapkan tinjauan…" : isDemo ? "Siapkan Tinjauan Surat" : "Generate Pratinjau PDF"}
           </span>
         </button>
 
@@ -255,7 +267,7 @@ export function DraftSummary({
           className="w-full flex h-11 items-center justify-center gap-2 rounded-lg bg-navy text-body font-bold text-white shadow-card hover:bg-navy-hover disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           <CheckIcon className="size-4" />
-          <span>{status === "submitting" ? "Mengajukan…" : "Ajukan Surat Sekarang"}</span>
+          <span>{status === "submitting" ? "Mengajukan…" : isDemo ? "Ajukan Surat Demo" : "Ajukan Surat Sekarang"}</span>
         </button>
         <p className="text-center text-micro text-slate-400">
           Ajukan hanya setelah pratinjau sesuai. Perubahan data membatalkan

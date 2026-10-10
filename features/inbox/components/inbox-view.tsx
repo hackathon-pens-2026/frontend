@@ -136,8 +136,7 @@ export function InboxView({
       await onRefresh();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
-        showToast("Tugas berhasil diproses · tahap berikutnya diaktifkan");
-        await onRefresh();
+        showToast("Akses akun backend kedaluwarsa. Pilih ulang akun; tindakan belum berhasil.");
       } else {
         const msg = describeError(cause);
         if (msg) showToast(msg);
@@ -179,10 +178,7 @@ export function InboxView({
       setDelegateOpen(false);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
-        showToast(messages[action]);
-        setModalMode(null);
-        setDelegateOpen(false);
-        await onRefresh();
+        showToast("Akses akun backend kedaluwarsa. Pilih ulang akun; tindakan belum berhasil.");
       } else {
         const msg = describeError(cause);
         if (msg) showToast(msg);

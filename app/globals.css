@@ -116,6 +116,7 @@ body {
   animation: rise 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise {
     animation: none;

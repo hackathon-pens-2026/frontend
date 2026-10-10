@@ -14,8 +14,7 @@ import {
   CheckIcon,
 } from "./icons";
 import { ApiError } from "@/lib/api/errors";
-import { downloadFinalLetter } from "@/lib/api/letters";
-import { loadAccountDashboard } from "@/lib/api/account-data";
+import { listMyLetters, downloadFinalLetter } from "@/lib/api/letters";
 import { getLetterWorkflow } from "@/lib/api/workflow";
 import { formatDateTime, taskStatusToBadge } from "@/lib/display/letter";
 import { saveBlob } from "@/lib/display/download";
@@ -47,9 +46,6 @@ function toDrawerStep(task: WorkflowTaskDto): DrawerStep {
 export default function StudentDashboard() {
   const { user, status: sessionStatus } = useSession();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
-  const [tasks, setTasks] = useState<WorkflowTaskDto[]>([]);
-  const [taskTotal, setTaskTotal] = useState(0);
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataAvailable, setDataAvailable] = useState(false);
@@ -80,16 +76,10 @@ export default function StudentDashboard() {
     Promise.resolve().then(() => {
       if (active) { setLoading(true); setDataAvailable(false); setLetters([]); }
     });
-    loadAccountDashboard(user.id)
+    listMyLetters(1, 50)
       .then((result) => {
         if (!active) return;
-        setLetters(result.letters.items.map(toDashboardLetter));
-        setStatusCounts(result.letters.statusCounts ?? result.letters.items.reduce<Record<string, number>>((counts, letter) => {
-          counts[letter.status] = (counts[letter.status] ?? 0) + 1;
-          return counts;
-        }, {}));
-        setTasks(result.tasks.items);
-        setTaskTotal(result.tasks.total);
+        setLetters(result.items.map(toDashboardLetter));
         setError(null);
         setDataAvailable(true);
       })
@@ -183,10 +173,10 @@ export default function StudentDashboard() {
   }, [letters, filter, searchQuery]);
 
   const metrics: SummaryMetric[] = useMemo(() => {
-    const active = (statusCounts.InProgress ?? 0) + (statusCounts.Finalizing ?? 0) + (statusCounts.AwaitingResourceResolution ?? 0);
-    const waiting = (statusCounts.Draft ?? 0) + taskTotal;
-    const approved = statusCounts.Completed ?? 0;
-    const revision = statusCounts.NeedsRevision ?? 0;
+    const active = letters.filter((l) => l.status === "review").length;
+    const waiting = letters.filter((l) => l.status === "pending").length;
+    const approved = letters.filter((l) => l.status === "approved").length;
+    const revision = letters.filter((l) => l.status === "rejected").length;
     const items: SummaryMetric[] = [
       {
         id: "active",
@@ -199,7 +189,7 @@ export default function StudentDashboard() {
         id: "waiting",
         title: "Menunggu Aksi Anda",
         value: `${waiting}`,
-        subtitle: `${statusCounts.Draft ?? 0} draf · ${taskTotal} tugas persetujuan aktif`,
+        subtitle: "draf atau perlu dilanjutkan",
         variant: "warning",
       },
       {
@@ -218,7 +208,7 @@ export default function StudentDashboard() {
       },
     ];
     return items.map((metric) => ({ ...metric, value: dataAvailable ? metric.value : "—" }));
-  }, [statusCounts, taskTotal, dataAvailable]);
+  }, [letters, dataAvailable]);
 
   const activeCount = letters.filter(
     (l) => l.status === "review" || l.status === "pending",
@@ -237,7 +227,7 @@ export default function StudentDashboard() {
         </div>
       )}
 
-      <StudentSidebar currentPath="/" letterCount={activeCount} pendingCount={dataAvailable ? taskTotal : undefined} />
+      <StudentSidebar currentPath="/" letterCount={activeCount} />
 
       <div className="md:pl-[260px] min-h-screen min-w-0 flex flex-col bg-canvas">
         <main className="mx-auto w-full max-w-[1240px] space-y-6 px-4 pb-6 pt-16 md:px-8 md:pt-6 flex-1 bg-canvas">
@@ -254,7 +244,6 @@ export default function StudentDashboard() {
               <div role="status" className="flex shrink-0 items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-midnight/60 shadow-xs">
                 <span aria-hidden="true" className={`size-2 rounded-full ${dataAvailable ? "bg-ok" : "bg-midnight/30"}`} />
                 <span>{loading ? "Memuat data…" : dataAvailable ? "Tersinkron dengan server" : "Data belum tersedia"}</span>
-                <button type="button" disabled={loading} onClick={retryLoadLetters} className="ml-2 underline disabled:opacity-50">Perbarui</button>
               </div>
             </div>
 
@@ -279,20 +268,6 @@ export default function StudentDashboard() {
                 else if (id === "revision") setFilter("Revisi");
               }}
             />
-
-            {dataAvailable && tasks.length > 0 && (
-              <section aria-label="Tugas persetujuan Anda" className="rounded-xl border border-line bg-surface p-5">
-                <h2 className="text-title font-semibold">Menunggu Tanda Tangan Anda ({taskTotal})</h2>
-                <ul className="mt-3 space-y-3">
-                  {tasks.map((task) => (
-                    <li key={task.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 last:border-0">
-                      <div><p className="font-medium">{task.title}</p><p className="text-xs text-midnight/60">{task.number} · {task.positionName ?? `Tahap ${task.order}`}</p></div>
-                      <Link href="/persetujuan" className="rounded-lg bg-navy px-4 py-2 text-surface">Buka Persetujuan</Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
 
             <AttentionSection
               letters={letters}

@@ -603,8 +603,21 @@ export function LetterAssistant() {
 
       // 2. Resilient Local Simulation Fallback
       if (!template) {
+        const lowerRaw = raw.toLowerCase();
+        const matched = templates.find(
+          (t) =>
+            t.name.toLowerCase().includes(lowerRaw) ||
+            lowerRaw.includes(t.name.toLowerCase()) ||
+            (lowerRaw.includes("proposal") && t.typeId.includes("proposal")) ||
+            (lowerRaw.includes("lpj") && t.typeId.includes("lpj")) ||
+            ((lowerRaw.includes("ruang") || lowerRaw.includes("fasilitas")) && t.typeId.includes("peminjaman")),
+        );
+        if (matched) {
+          void selectTemplate(matched);
+          return;
+        }
         addMessage(
-          "Pilih tipe surat terlebih dahulu dari daftar template di atas.",
+          "Pilih jenis surat terlebih dahulu dari daftar pilihan di atas.",
           "bot",
           "error",
         );
@@ -684,8 +697,8 @@ export function LetterAssistant() {
     const list: string[] = [];
     if (!template) {
       list.push("Peminjaman Ruangan & Fasilitas");
-      list.push("Dispensasi Kuliah");
-      list.push("Permohonan Dana");
+      list.push("Proposal Kegiatan");
+      list.push("Laporan Pertanggungjawaban (LPJ)");
       return list;
     }
     const emptyKeys = missingRequired.map((f) => f.label);

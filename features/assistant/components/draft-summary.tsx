@@ -87,8 +87,8 @@ export function DraftSummary({
             <h2 className="text-title font-bold text-midnight">Ringkasan Data Surat</h2>
             <p className="mt-0.5 text-micro text-slate-500">
               {template
-                ? `${template.name} · skema versi ${template.version}`
-                : "Pilih tipe surat untuk memuat skema field"}
+                ? `${template.name} · Versi ${template.version}`
+                : "Pilih jenis surat untuk melihat data yang perlu dilengkapi"}
             </p>
           </div>
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-canvas text-slate-400 ring-1 ring-line">
@@ -100,14 +100,14 @@ export function DraftSummary({
           {progress === 100 && userFields.length > 0 ? (
             <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-micro font-semibold text-emerald-800 ring-1 ring-emerald-200">
               <CheckCircle2Icon className="size-4 shrink-0 text-emerald-600" />
-              Semua field wajib sudah lengkap. Buat pratinjau PDF lalu ajukan.
+              Semua data wajib sudah lengkap. Buat pratinjau PDF lalu ajukan.
             </div>
           ) : (
             <div className="flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-micro font-semibold text-amber-800 ring-1 ring-amber-200">
               <AlertCircleIcon className="size-4 shrink-0 text-amber-600" />
               {template
-                ? `${missing.length} field wajib belum lengkap (${filled}/${userFields.length} terisi)`
-                : "Belum ada tipe surat yang dipilih"}
+                ? `${missing.length} data wajib belum lengkap (${filled}/${userFields.length} terisi)`
+                : "Belum ada jenis surat yang dipilih"}
             </div>
           )}
           <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
@@ -122,8 +122,7 @@ export function DraftSummary({
       <div className="scroll-thin mt-5 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
         {template === null && (
           <p className="rounded-lg border border-dashed border-line bg-canvas px-4 py-6 text-center text-body text-slate-500">
-            Pilih tipe surat di panel sebelah kiri untuk menampilkan field dari
-            skema backend.
+            Pilih jenis surat di panel sebelah kiri untuk mulai mengisi data formulir pengajuan.
           </p>
         )}
 

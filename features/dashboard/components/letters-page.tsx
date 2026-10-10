@@ -24,6 +24,13 @@ export function LettersPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const showNotification = (message: string) => {
+    if (
+      !message ||
+      message.toLowerCase().includes("login kembali") ||
+      message.toLowerCase().includes("masuk kembali")
+    ) {
+      return;
+    }
     setToastMessage(message);
     window.setTimeout(() => setToastMessage(""), 3400);
   };

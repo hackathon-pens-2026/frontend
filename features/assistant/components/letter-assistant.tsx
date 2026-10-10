@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { AssistantMessage } from "../types";
 import { StudentSidebar } from "@/features/shell";
 import { DraftSummary, DraftStatus } from "./draft-summary";
+import { MessageContent } from "./message-content";
 import {
   ArrowDownIcon,
   Button,
@@ -809,7 +810,7 @@ export function LetterAssistant() {
 
       // Catatan teks umum
       addMessage(
-        `Catatan Anda disimpan: "${raw}".\n\n💡 **Tips**: Anda dapat mengetik detail secara langsung, contoh:\n• *"Nama kegiatan: Workshop Cloud Computing"*\n• *"Tanggal 28 Oktober 2026 pukul 08.00 - 15.00"*\n• *"Ruangan: Ruang Teater D4"*`,
+        `**Catatan Anda disimpan:**\n${raw}\n\n**Tips pengisian**\nKetik detail berikut pada baris terpisah:\n• Nama kegiatan: Workshop Cloud Computing\n• Tanggal: 28 Oktober 2026\n• Waktu: 08.00–15.00\n• Ruangan: Ruang Teater D4`,
         "bot",
       );
     },
@@ -966,7 +967,7 @@ export function LetterAssistant() {
                         : "rounded-tl-md bg-canvas text-slate-700 ring-1 ring-line"
                     }`}
                   >
-                    <div>{message.text}</div>
+                    <MessageContent text={message.text} formatted={message.from === "bot"} />
                     <div
                       className={`mt-1 flex items-center gap-1 text-[10px] ${
                         message.from === "user"

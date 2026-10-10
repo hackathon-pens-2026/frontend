@@ -94,9 +94,7 @@ export function postLoginPath(user: UserDto, requested: string | null): string {
     const pathname = new URL(sanitized, "https://signit.invalid").pathname;
     const redirect = routeRedirect(user, pathname);
     if (!redirect) return sanitized;
-    // Alias /staff boleh menuju kotak persetujuan; target lain yang tidak
-    // diizinkan dikembalikan ke dasbor surface pengguna (bukan inbox).
-    return pathname === "/staff" ? redirect : dashboardPath(user.uiSurface);
+    return redirect;
   }
   return dashboardPath(user.uiSurface);
 }

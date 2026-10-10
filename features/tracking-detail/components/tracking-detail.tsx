@@ -304,7 +304,7 @@ export function TrackingDetail({
         <div className="lg:col-span-5 xl:col-span-5 space-y-6">
           <DocumentSummaryCard summary={data.summary} />
 
-          <AuditTrailCard logs={data.auditTrail} />
+          <AuditTrailCard logs={data.auditTrail} letterNumber={data.letterNumber} />
         </div>
       </div>
     </div>

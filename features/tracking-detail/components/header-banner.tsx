@@ -75,7 +75,7 @@ export function HeaderBanner({
         </button>
         <ChevronRightIcon size={12} className="text-slate-400" />
         <span className="font-semibold text-slate-900">
-          Detail Pelacakan #{letterNumber.split("/")[0] || "042"}
+          Detail Pelacakan {letterNumber ? `#${letterNumber.split("/")[0]}` : ""}
         </span>
       </nav>
 

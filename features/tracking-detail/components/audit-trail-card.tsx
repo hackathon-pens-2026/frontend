@@ -6,11 +6,10 @@ import { FileSpreadsheetIcon } from "./icons";
 
 interface AuditTrailCardProps {
   logs: AuditLogItem[];
-  letterNumber?: string;
   onExportCsv?: () => void;
 }
 
-export function AuditTrailCard({ logs, letterNumber, onExportCsv }: AuditTrailCardProps) {
+export function AuditTrailCard({ logs, onExportCsv }: AuditTrailCardProps) {
   const [filter, setFilter] = useState<AuditCategory>("all");
 
   const filteredLogs = useMemo(() => {
@@ -37,12 +36,11 @@ export function AuditTrailCard({ logs, letterNumber, onExportCsv }: AuditTrailCa
       )
       .join("\n");
 
-    const safeNumber = (letterNumber || "surat").replace(/[/\\]/g, "-");
     const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `audit-trail-${safeNumber}-${Date.now()}.csv`);
+    link.setAttribute("download", `audit-trail-042-KM-PENS-${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

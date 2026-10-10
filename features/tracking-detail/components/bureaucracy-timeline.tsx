@@ -16,14 +16,6 @@ interface BureaucracyTimelineProps {
   stages: TimelineStage[];
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "PT";
-  const first = parts[0]?.[0] ?? "";
-  const second = parts.length > 1 ? parts[parts.length - 1]?.[0] ?? "" : "";
-  return (first + second).toUpperCase();
-}
-
 export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
   // Keep track of which stages have open accordion details
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
@@ -44,7 +36,7 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">Rantai Birokrasi</h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            {stages.length} tahap · alur persetujuan &amp; legalisasi digital
+            8 tahap hybrid · organisasi mahasiswa → unit kampus → legalisasi digital
           </p>
         </div>
 
@@ -76,9 +68,9 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
           <div className="flex-1 space-y-1">
             <div className="font-semibold text-blue-950">Kebijakan Eskalasi &amp; SLA Respon</div>
             <p className="text-blue-800 leading-relaxed text-[11px]">
-              Setiap verifikator memiliki batas waktu respons SLA kerja. Apabila melebihi batas waktu,
-              sistem SignIt! secara otomatis menandai status lewat SLA pada antrean tugas agar proses
-              surat tidak tertunda.
+              Setiap verifikator memiliki SLA respon 24 jam kerja. Apabila melebihi batas waktu (10
+              Okt, 11:00 WIB), sistem SignIt! akan secara otomatis mengeskalasi draf surat ke unit
+              terkait untuk memastikan kegiatan mahasiswa tidak tertunda.
             </p>
           </div>
           <button
@@ -157,7 +149,7 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
                         </h3>
                         <div className="flex items-center gap-2 text-slate-600 pt-0.5">
                           <span className="flex size-5 items-center justify-center rounded-full bg-purple-100 text-[10px] font-bold text-purple-700">
-                            {initialsOf(stage.assigneeName)}
+                            HA
                           </span>
                           <span className="font-semibold text-slate-900">{stage.assigneeName}</span>
                           <span className="text-slate-400">·</span>
@@ -277,23 +269,21 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
                     {/* Expandable Details Container */}
                     {isExpanded && (stage.note || stage.sha256 || stage.delegation) && (
                       <div className="border-t border-slate-200/80 px-4 pt-3 pb-4 space-y-3">
-                        {/* Note */}
-                        {stage.note && (
-                          <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-2.5 text-xs text-emerald-900">
-                            <span className="font-semibold">Catatan {stage.role}:</span> “{stage.note}”
-                          </div>
-                        )}
-
-                        {/* TTE Valid Stamp & SHA-256 */}
-                        {stage.sha256 && (
+                        {/* Stage 1: Proposal Note, BSrE & TTE Valid Stamp */}
+                        {stage.stepNumber === 1 && (
                           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1">
+                            <div className="space-y-2">
+                              {stage.note && (
+                                <p className="italic text-slate-700 font-medium">
+                                  {stage.note}
+                                </p>
+                              )}
                               <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                                 <span className="font-mono">SHA-256: {stage.sha256}</span>
                                 <span>·</span>
                                 <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
                                   <ShieldCheckIcon size={13} className="text-emerald-600" />
-                                  Tanda tangan digital terverifikasi
+                                  Sertifikat BSrE terverifikasi
                                 </span>
                               </div>
                             </div>
@@ -301,6 +291,7 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
                             {/* Authentic Green TTE Valid Stamp */}
                             <div className="shrink-0 self-start md:self-center">
                               <div className="relative inline-flex items-center gap-2 rounded-md border-2 border-emerald-600/70 bg-emerald-50/70 px-2.5 py-1.5 text-emerald-900 shadow-2xs rotate-[-1.5deg]">
+                                {/* 5x5 Micro Matrix Dots simulating QR watermark */}
                                 <div className="grid grid-cols-5 gap-0.5 p-0.5 bg-emerald-600/10 rounded">
                                   {Array.from({ length: 25 }).map((_, i) => (
                                     <div
@@ -317,7 +308,7 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
                                     TTE Valid · SignIt!
                                   </div>
                                   <div className="font-mono text-[9px] text-emerald-700">
-                                    {stage.sha256} {stage.timestamp ? `· ${stage.timestamp}` : ""}
+                                    {stage.sha256} · 08 Okt, 09:15
                                   </div>
                                 </div>
                               </div>
@@ -325,14 +316,23 @@ export function BureaucracyTimeline({ stages }: BureaucracyTimelineProps) {
                           </div>
                         )}
 
-                        {/* Delegation Card */}
-                        {stage.delegation && (
+                        {/* Stage 3: Approver Note */}
+                        {stage.stepNumber === 3 && stage.note && (
+                          <div className="rounded-lg bg-emerald-50/70 border border-emerald-200 p-2.5 text-xs text-emerald-900">
+                            <span className="font-semibold">Catatan Dosen Pembina:</span> “{stage.note}”
+                          </div>
+                        )}
+
+                        {/* Stage 4: Delegation Card Matching Figma */}
+                        {stage.stepNumber === 4 && stage.delegation && (
                           <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 space-y-2">
                             <div className="flex items-center gap-2.5">
+                              {/* Delegator Avatar */}
                               <span className="flex size-6 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-800">
                                 {stage.delegation.delegatorInitials}
                               </span>
                               <ArrowRightIcon size={14} className="text-purple-400" />
+                              {/* Delegate Avatar */}
                               <span className="flex size-6 items-center justify-center rounded-full bg-purple-200 text-[10px] font-bold text-purple-900">
                                 {stage.delegation.delegateInitials}
                               </span>

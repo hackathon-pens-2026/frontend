@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { AuditLogItem, TimelineStage, TrackingDetailData } from "../types";
 import { HeaderBanner } from "./header-banner";
 import { BureaucracyTimeline } from "./bureaucracy-timeline";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/display/letter";
 import { saveBlob } from "@/lib/display/download";
 import type { WorkflowTaskDto } from "@/lib/api/types";
+import { SignedLetterPreview } from "@/features/signatures/signed-letter-preview";
 
 interface TrackingDetailProps {
   letterId: string;
@@ -281,6 +283,12 @@ export function TrackingDetail({
         onDownloadDraft={() => void handleDownloadDocument()}
       />
 
+      {data.totalStages > 0 && <SignedLetterPreview key={letterId} letterId={letterId} refresh={0} />}
+      {data.totalStages === 0 && <section className="rounded-xl border border-line bg-surface p-5 text-midnight">
+        <p className="text-body">Draft belum diajukan. Buka formulir untuk menyiapkan PDF dari template backend, lalu tinjau sebelum mengajukan.</p>
+        <Link href={`/surat/baru?draftId=${letterId}`} className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-navy px-4 text-surface">Edit / Tinjau Draft</Link>
+      </section>}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-7 xl:col-span-7 space-y-6">
           <BureaucracyTimeline stages={data.stages} />
@@ -289,12 +297,7 @@ export function TrackingDetail({
         <div className="lg:col-span-5 xl:col-span-5 space-y-6">
           <DocumentSummaryCard summary={data.summary} />
 
-          <AuditTrailCard
-            logs={data.auditTrail}
-            onExportCsv={() => {
-              onShowNotification?.("Audit trail CSV berhasil diekspor.");
-            }}
-          />
+          <AuditTrailCard logs={data.auditTrail} />
         </div>
       </div>
     </div>

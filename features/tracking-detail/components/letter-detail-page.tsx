@@ -1,8 +1,9 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { StudentSidebar } from "@/features/shell";
 import { TrackingDetail } from "./tracking-detail";
+import { BackendLetterReview } from "./backend-letter-review";
 
 const GUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -10,13 +11,14 @@ const GUID_PATTERN =
 export function LetterDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const documentId = useSearchParams().get("documentId") ?? "";
   const id = typeof params?.id === "string" ? params.id : "";
 
   return (
     <div className="min-h-screen bg-canvas">
       <StudentSidebar currentPath="/surat" />
       <div className="pt-16 md:pt-0 md:pl-[260px]">
-        {GUID_PATTERN.test(id) ? (
+        {GUID_PATTERN.test(id) && GUID_PATTERN.test(documentId) ? <BackendLetterReview key={`${id}:${documentId}`} letterId={id} documentId={documentId} /> : GUID_PATTERN.test(id) ? (
           <TrackingDetail
             letterId={id}
             onBackToDashboard={() => router.push("/")}

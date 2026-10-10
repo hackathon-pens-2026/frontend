@@ -114,7 +114,7 @@ export function UserSwitcher() {
 
       {/* Dropdown Menu */}
       {open && (
-        <div id={dropdownId} role="region" aria-label="Ganti peran demo" className="absolute top-full left-0 z-50 mt-1.5 w-full rounded-2xl border border-white/15 bg-midnight p-2 text-white shadow-modal animate-rise">
+        <div id={dropdownId} role="region" aria-label="Pilih akun UAT" className="absolute top-full left-0 z-50 mt-1.5 w-full rounded-2xl border border-white/15 bg-midnight p-2 text-white shadow-modal animate-rise">
           <div className="border-b border-white/10 px-3 py-2">
             <div className="text-micro font-bold text-gold uppercase tracking-wider">
               Ganti Jabatan / Peran Demo

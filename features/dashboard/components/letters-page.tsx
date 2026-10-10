@@ -153,12 +153,12 @@ export function LettersPage() {
 
           <SubmissionSearch value={searchQuery} onChange={setSearchQuery} />
 
-          <AttentionSection
+          {<AttentionSection
             letters={letters}
             onOpenLetter={(letter) => {
               router.push(`/surat/${letter.id}`);
             }}
-          />
+          />}
 
           {loading ? (
             <p className="rounded-xl border border-line bg-white px-6 py-10 text-center text-body text-slate-500">

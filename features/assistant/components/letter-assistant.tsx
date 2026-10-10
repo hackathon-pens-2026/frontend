@@ -11,12 +11,10 @@ import {
   Button,
   CheckCheckIcon,
   CheckIcon,
-  ClockIcon,
   SendIcon,
   SignItIcon,
   SparklesIcon,
 } from "@/components/ui";
-import { ApiError } from "@/lib/api/errors";
 import { createIdempotencyKey } from "@/lib/api/idempotency";
 import {
   createOrResumeSession,
@@ -26,6 +24,7 @@ import {
   createDraft,
   editDraft,
   getPreview,
+  getLetter,
   queuePreview,
   submitLetter,
 } from "@/lib/api/letters";
@@ -36,13 +35,7 @@ import {
   listResources,
 } from "@/lib/api/routing";
 import { listTemplates } from "@/lib/api/templates";
-import {
-  DEFAULT_TEMPLATES,
-  DEFAULT_ORGANIZATIONS,
-  DEFAULT_CANDIDATES,
-  DEFAULT_FACILITIES,
-  DEFAULT_RESOURCES,
-} from "@/lib/templates/default-catalog";
+import { useSession } from "@/lib/auth/session-provider";
 import { detectTemplate, extractFieldsFromText } from "@/lib/assistant/nlp-parser";
 import type {
   DraftDto,
@@ -61,14 +54,15 @@ const timeNow = () =>
   new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
 const errorText = (cause: unknown, fallback: string) =>
-  cause instanceof ApiError ? cause.message : fallback;
+  cause instanceof Error && cause.message ? cause.message : fallback;
 
-export function LetterAssistant() {
+function LetterAssistantContent() {
+  const { currentPersonaId } = useSession();
   const searchParams = useSearchParams();
   const urlDraftId = searchParams.get("draftId");
   const urlTypeId = searchParams.get("typeId");
 
-  const [templates, setTemplates] = useState<LetterTemplateDto[]>(DEFAULT_TEMPLATES);
+  const [templates, setTemplates] = useState<LetterTemplateDto[]>([]);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [template, setTemplate] = useState<LetterTemplateDto | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -85,28 +79,30 @@ export function LetterAssistant() {
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isBackendConnected, setIsBackendConnected] = useState<boolean | null>(null);
-  const [suggestedWidget, setSuggestedWidget] = useState<string | null>(null);
+  const [, setSuggestedWidget] = useState<string | null>(null);
 
-  const [organizations, setOrganizations] = useState<RoutingOrganizationDto[]>(DEFAULT_ORGANIZATIONS);
-  const [organizationsLoaded, setOrganizationsLoaded] = useState(true);
-  const [organizationId, setOrganizationId] = useState(DEFAULT_ORGANIZATIONS[0].id);
-  const [candidates, setCandidates] = useState<RoutingCandidateDto[]>(DEFAULT_CANDIDATES);
-  const [committeeChairId, setCommitteeChairId] = useState(DEFAULT_CANDIDATES[0].userId);
-  const [organizationChairId, setOrganizationChairId] = useState(DEFAULT_CANDIDATES[1].userId);
-  const [facilities, setFacilities] = useState<RoutingFacilityDto[]>(DEFAULT_FACILITIES);
-  const [facilityId, setFacilityId] = useState(DEFAULT_FACILITIES[0].id);
-  const [resources, setResources] = useState<RoutingResourceDto[]>(DEFAULT_RESOURCES);
-  const [resourceId, setResourceId] = useState(DEFAULT_RESOURCES[0].id);
+  const [organizations, setOrganizations] = useState<RoutingOrganizationDto[]>([]);
+  const [organizationId, setOrganizationId] = useState("");
+  const [candidates, setCandidates] = useState<RoutingCandidateDto[]>([]);
+  const [committeeChairId, setCommitteeChairId] = useState("");
+  const [organizationChairId, setOrganizationChairId] = useState("");
+  const [facilities, setFacilities] = useState<RoutingFacilityDto[]>([]);
+  const [facilityId, setFacilityId] = useState("");
+  const [resources, setResources] = useState<RoutingResourceDto[]>([]);
+  const [resourceId, setResourceId] = useState("");
   const [draft, setDraft] = useState<DraftDto | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [preview, setPreview] = useState<LetterPreviewDto | null>(null);
   const [status, setStatus] = useState<DraftStatus>("idle");
   const [submittedNumber, setSubmittedNumber] = useState<string | null>(null);
+  const [submittedLetterId, setSubmittedLetterId] = useState<string | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   const cancelled = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const operationInFlight = useRef(false);
+  const submissionKey = useRef<string | null>(null);
 
   const addMessage = useCallback(
     (
@@ -157,7 +153,7 @@ export function LetterAssistant() {
   useEffect(() => {
     cancelled.current = false;
     void (async () => {
-      let catalog: LetterTemplateDto[] = DEFAULT_TEMPLATES;
+      let catalog: LetterTemplateDto[] = [];
       try {
         const [loadedCatalog, orgs] = await Promise.all([
           listTemplates(),
@@ -172,10 +168,17 @@ export function LetterAssistant() {
           setOrganizations(orgs);
           setOrganizationId(orgs[0].id);
         }
-        setOrganizationsLoaded(true);
-      } catch {
+        if (urlDraftId) {
+          const saved = await getLetter(urlDraftId);
+          if (cancelled.current) return;
+          setDraft(saved);
+          setFields(JSON.parse(saved.dataJson));
+          setTemplate(catalog.find((t) => t.typeId === saved.typeId) ?? null);
+          setDraftSavedAt(timeNow());
+        }
+      } catch (cause) {
         if (!cancelled.current) {
-          setTemplatesError(null);
+          setTemplatesError(errorText(cause, "Data server belum dapat dimuat. Input di halaman ini belum tersimpan di server."));
         }
       }
 
@@ -230,7 +233,7 @@ export function LetterAssistant() {
     return () => {
       cancelled.current = true;
     };
-  }, [urlDraftId, urlTypeId]);
+  }, [urlDraftId, urlTypeId, currentPersonaId]);
 
   const selectTemplate = useCallback(
     async (next: LetterTemplateDto) => {
@@ -253,17 +256,17 @@ export function LetterAssistant() {
       setDraftSavedAt(null);
       setPreview(null);
       setSubmittedNumber(null);
+      setSubmittedLetterId(null);
       setStatus("idle");
       setDirty(false);
 
       if (next.typeId === "peminjaman-ruangan") {
-        setFacilities(DEFAULT_FACILITIES);
-        setFacilityId(DEFAULT_FACILITIES[0].id);
-        const facRes = DEFAULT_RESOURCES.filter(
-          (r) => r.facilityId === DEFAULT_FACILITIES[0].id,
-        );
-        setResources(facRes);
-        setResourceId(facRes[0]?.id ?? "");
+        const initialFacility = "";
+        const initialResources: RoutingResourceDto[] = [];
+        setFacilities([]);
+        setFacilityId(initialFacility);
+        setResources(initialResources);
+        setResourceId(initialResources[0]?.id ?? "");
 
         void listFacilities()
           .then((facs) => {
@@ -278,7 +281,7 @@ export function LetterAssistant() {
               });
             }
           })
-          .catch(() => {});
+          .catch((cause) => addMessage(errorText(cause, "Katalog fasilitas belum dapat dimuat."), "bot", "error"));
       } else {
         setFacilities([]);
         setFacilityId("");
@@ -329,61 +332,41 @@ export function LetterAssistant() {
     [sessionId, isBackendConnected, addMessage],
   );
 
-  const loadCandidates = useCallback(
-    async (orgId: string) => {
-      setCommitteeChairId(DEFAULT_CANDIDATES[0].userId);
-      setOrganizationChairId(DEFAULT_CANDIDATES[1].userId);
-      setCandidates(DEFAULT_CANDIDATES);
-      if (!orgId) return;
-      try {
-        const result = await listOrganizationCandidates(orgId);
-        if (result && result.length > 0) {
-          setCandidates(result);
-          const committee = result.find((c) => c.positionCode === "Ketupel");
-          const chair = result.find((c) => c.positionCode === "KetuaOrganisasi");
-          const selectedComm = committee?.userId ?? result[0]?.userId ?? "";
-          const selectedChair = chair?.userId ?? result[0]?.userId ?? "";
-          setCommitteeChairId(selectedComm);
-          setOrganizationChairId(selectedChair);
-
-          if (sessionId && isBackendConnected) {
-            void sendChatMessage(sessionId, {
-              directFieldUpdates: {
-                organizationId: orgId,
-                committeeChairId: selectedComm,
-                organizationChairId: selectedChair,
-              },
-            });
-          }
-        }
-      } catch {
-        // Tetap gunakan DEFAULT_CANDIDATES untuk demo lokal
-      }
-    },
-    [sessionId, isBackendConnected],
-  );
+  useEffect(() => {
+    if (!organizationId) return;
+    let active = true;
+    listOrganizationCandidates(organizationId).then((result) => {
+      if (!active) return;
+      setCandidates(result);
+      setCommitteeChairId(result.find((c) => c.positionCode === "Ketupel")?.userId ?? "");
+      setOrganizationChairId(result.find((c) => c.positionCode === "KetuaOrganisasi")?.userId ?? "");
+    }).catch((cause) => {
+      if (active) addMessage(errorText(cause, "Peserta organisasi belum dapat dimuat."), "bot", "error");
+    });
+    return () => { active = false; };
+  }, [organizationId, addMessage]);
 
   const selectFacility = useCallback(
     async (nextFacilityId: string) => {
       setFacilityId(nextFacilityId);
-      const defaultForFac = DEFAULT_RESOURCES.filter(
-        (r) => r.facilityId === nextFacilityId,
-      );
-      setResources(defaultForFac);
-      setResourceId(defaultForFac[0]?.id ?? "");
+      setPreview(null);
+      submissionKey.current = null;
+      setResources([]);
+      setResourceId("");
 
       if (!nextFacilityId) return;
+
       try {
         const list = await listResources(nextFacilityId);
         if (list && list.length > 0) {
           setResources(list);
           setResourceId(list[0].id);
         }
-      } catch {
-        // Tetap gunakan default untuk demo lokal
+      } catch (cause) {
+        addMessage(errorText(cause, "Daftar ruangan belum dapat dimuat."), "bot", "error");
       }
     },
-    [],
+    [addMessage],
   );
 
   const updateField = useCallback(
@@ -395,21 +378,9 @@ export function LetterAssistant() {
         addMessage("Data berubah — pratinjau lama tidak berlaku lagi.");
       }
 
-      // Sync field update to backend session
-      if (sessionId && isBackendConnected && value.trim()) {
-        void sendChatMessage(sessionId, {
-          directFieldUpdates: { [key]: value },
-        })
-          .then((res) => {
-            if (res.draft) {
-              setDraft(res.draft);
-              setDraftSavedAt(timeNow());
-            }
-          })
-          .catch(() => {});
-      }
+      submissionKey.current = null;
     },
-    [preview, sessionId, isBackendConnected, addMessage],
+    [preview, addMessage],
   );
 
   const userFields = useMemo(
@@ -427,7 +398,7 @@ export function LetterAssistant() {
 
   const saveDraft = useCallback(
     async (silent = false): Promise<DraftDto | null> => {
-      if (!template || missingRequired.length > 0) return null;
+      if (!template) return null;
       setStatus("saving");
       try {
         const payload = {
@@ -460,22 +431,26 @@ export function LetterAssistant() {
         return saved;
       } catch (cause) {
         setStatus("idle");
-        addMessage(errorText(cause, "Draf gagal disimpan. Coba kembali."), "bot", "error");
+        addMessage(errorText(cause, "Draft belum tersimpan. Input tetap tersedia di halaman ini; coba simpan kembali."), "bot", "error");
         return null;
       }
     },
-    [template, fields, draft, missingRequired.length, userFields, addMessage],
+    [template, fields, draft, userFields, addMessage],
   );
 
   const generatePreview = useCallback(async () => {
-    if (!template || !routingComplete) {
+    if (operationInFlight.current) return;
+    if (!template || !routingComplete || missingRequired.length > 0) {
       addMessage(
-        "Lengkapi routing terlebih dahulu: organisasi, ketua pelaksana, ketua organisasi, dan ruangan bila diperlukan.",
+        "Lengkapi data wajib, organisasi, ketua pelaksana, ketua organisasi, dan ruangan bila diperlukan sebelum menyiapkan tinjauan.",
         "bot",
         "error",
       );
       return;
     }
+    operationInFlight.current = true;
+    setPreview(null);
+    submissionKey.current = null;
     setStatus("previewing");
     try {
       const current = !draft || dirty ? await saveDraft(true) : draft;
@@ -483,6 +458,7 @@ export function LetterAssistant() {
         setStatus("idle");
         return;
       }
+      setStatus("previewing");
       const request = {
         expectedVersion: current.version,
         expectedRevisionId: current.revisionId,
@@ -525,13 +501,15 @@ export function LetterAssistant() {
         );
       }
     } catch (cause) {
-      addMessage(errorText(cause, "Pratinjau tidak dapat dibuat."), "bot", "error");
+      addMessage(errorText(cause, "Pratinjau PDF belum tersedia. Data tetap tersedia; coba Generate kembali."), "bot", "error");
     } finally {
+      operationInFlight.current = false;
       setStatus("idle");
     }
   }, [
     template,
     routingComplete,
+    missingRequired.length,
     draft,
     dirty,
     organizationId,
@@ -543,8 +521,10 @@ export function LetterAssistant() {
   ]);
 
   const submit = useCallback(async () => {
-    if (!draft || !preview || !preview.reviewDocumentId || !preview.reviewHash)
+    if (operationInFlight.current || dirty || !draft || preview?.state !== "Ready" || preview.revisionId !== draft.revisionId || !preview.reviewDocumentId || !preview.reviewHash)
       return;
+    operationInFlight.current = true;
+    submissionKey.current ??= createIdempotencyKey();
     setStatus("submitting");
     try {
       const result = await submitLetter(
@@ -561,9 +541,10 @@ export function LetterAssistant() {
           expectedReviewHash: preview.reviewHash,
           slots: preview.slots,
         },
-        createIdempotencyKey(),
+        submissionKey.current,
       );
       setSubmittedNumber(result.number);
+      setSubmittedLetterId(result.letterId);
       setStatus("submitted");
       setPreview(null);
       addMessage(
@@ -571,20 +552,16 @@ export function LetterAssistant() {
         "bot",
         "success",
       );
-    } catch {
-      const simNumber = `6.1/INT/PMH/BPM/UKKI-PENS/X/${new Date().getFullYear()}`;
-      setSubmittedNumber(simNumber);
-      setStatus("submitted");
-      setPreview(null);
-      addMessage(
-        `Surat berhasil diajukan dalam Mode Simulasi dengan nomor ${simNumber}. Anda dapat berpindah peran di sidebar untuk menguji alur penandatanganan!`,
-        "bot",
-        "success",
-      );
+    } catch (cause) {
+      setStatus("idle");
+      addMessage(errorText(cause, "Surat belum berhasil diajukan. Periksa koneksi lalu coba kembali."), "bot", "error");
+    } finally {
+      operationInFlight.current = false;
     }
   }, [
     draft,
     preview,
+    dirty,
     organizationId,
     committeeChairId,
     organizationChairId,
@@ -622,6 +599,8 @@ export function LetterAssistant() {
 
           if (response.fields && Object.keys(response.fields).length > 0) {
             setFields((prev) => ({ ...prev, ...response.fields }));
+            setPreview(null);
+            submissionKey.current = null;
             setDirty(true);
           }
 
@@ -760,7 +739,7 @@ export function LetterAssistant() {
 
       // Catatan teks umum
       addMessage(
-        `**Catatan Anda disimpan:**\n${raw}\n\n**Tips pengisian**\nKetik detail berikut pada baris terpisah:\n• Nama kegiatan: Workshop Cloud Computing\n• Tanggal: 28 Oktober 2026\n• Waktu: 08.00–15.00\n• Ruangan: Ruang Teater D4`,
+        `**Catatan di halaman ini:**\n${raw}\n\n**Tips pengisian**\nKetik detail berikut pada baris terpisah:\n• Nama kegiatan: Workshop Cloud Computing\n• Tanggal: 28 Oktober 2026\n• Waktu: 08.00–15.00\n• Ruangan: Ruang Teater D4`,
         "bot",
       );
     },
@@ -791,10 +770,9 @@ export function LetterAssistant() {
   const organizationLabel = organizations.find((o) => o.id === organizationId);
   const resourceLabel = resources.find((r) => r.id === resourceId);
 
-  const canSave =
-    Boolean(template) && missingRequired.length === 0 && status === "idle";
-  const canGenerate = canSave && routingComplete;
-  const canSubmit = Boolean(preview) && !dirty && status === "idle";
+  const canSave = Boolean(template) && status === "idle";
+  const canGenerate = canSave && routingComplete && missingRequired.length === 0;
+  const canSubmit = preview?.state === "Ready" && preview.revisionId === draft?.revisionId && !dirty && status === "idle";
 
   // Dynamic quick suggestions capped at 3 (Hick's law)
   const quickSuggestions = useMemo(() => {
@@ -849,7 +827,7 @@ export function LetterAssistant() {
                       {isBackendConnected === true
                         ? "Terhubung ke AI Assistant Backend"
                         : isBackendConnected === false
-                        ? "Mode Simulasi Lokal (Offline)"
+                        ? "Formulir — belum tersimpan di server"
                         : "Menghubungkan ke backend…"}
                     </span>
                   </div>
@@ -978,7 +956,8 @@ export function LetterAssistant() {
                       onChange={(event) => {
                         const orgId = event.target.value;
                         setOrganizationId(orgId);
-                        void loadCandidates(orgId);
+                        setPreview(null);
+                        submissionKey.current = null;
                         const org = organizations.find((o) => o.id === orgId);
                         if (org) {
                           addMessage(`Organisasi pemohon: ${org.name}`, "user");
@@ -1003,6 +982,8 @@ export function LetterAssistant() {
                         onChange={(event) => {
                           const candId = event.target.value;
                           setCommitteeChairId(candId);
+                          setPreview(null);
+                          submissionKey.current = null;
                           const cand = candidates.find((c) => c.userId === candId);
                           if (cand) {
                             addMessage(`Ketua Pelaksana: ${cand.name}`, "user");
@@ -1024,6 +1005,14 @@ export function LetterAssistant() {
                           : "Pilih organisasi pemohon terlebih dahulu"}
                       </div>
                     )}
+                  </label>
+
+                  <label className="space-y-1 text-micro font-medium text-midnight/70">
+                    Ketua Organisasi
+                    <select value={organizationChairId} onChange={(event) => { setOrganizationChairId(event.target.value); setPreview(null); submissionKey.current = null; }} className="h-10 w-full rounded-lg border border-line bg-surface px-2.5 text-body text-midnight focus-visible:outline-2 focus-visible:outline-navy">
+                      <option value="">Pilih ketua organisasi…</option>
+                      {chairCandidates.map((candidate) => <option key={candidate.userId} value={candidate.userId}>{candidate.name} — {candidate.positionName}</option>)}
+                    </select>
                   </label>
 
                   {template.typeId === "peminjaman-ruangan" && (
@@ -1050,6 +1039,8 @@ export function LetterAssistant() {
                           onChange={(event) => {
                             const resId = event.target.value;
                             setResourceId(resId);
+                            setPreview(null);
+                            submissionKey.current = null;
                             const res = resources.find((r) => r.id === resId);
                             if (res) {
                               addMessage(`Ruangan: ${res.code}`, "user");
@@ -1060,7 +1051,7 @@ export function LetterAssistant() {
                                     resourceId: resId,
                                     ruangan: res.code,
                                   },
-                                });
+                                }).catch(() => {});
                               }
                             }
                           }}
@@ -1163,7 +1154,9 @@ export function LetterAssistant() {
             canGenerate={canGenerate}
             canSubmit={canSubmit}
             submittedNumber={submittedNumber}
-            submittedLetterId={draft?.id ?? null}
+            submittedLetterId={submittedLetterId}
+            isDemo={false}
+            reviewHref={preview?.reviewDocumentId && draft ? `/surat/${draft.id}?documentId=${preview.reviewDocumentId}` : null}
             onSaveDraft={() => void saveDraft()}
             onGeneratePreview={() => void generatePreview()}
             onSubmit={() => void submit()}
@@ -1197,5 +1190,10 @@ export function LetterAssistant() {
       </div>
     </div>
   );
+}
+export function LetterAssistant() {
+  const { currentPersonaId } = useSession();
+  const searchParams = useSearchParams();
+  return <LetterAssistantContent key={`${currentPersonaId}:${searchParams.get("draftId") ?? "new"}`} />;
 }
 export default LetterAssistant;

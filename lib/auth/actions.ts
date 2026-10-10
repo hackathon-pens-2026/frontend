@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { ApiError, toApiError } from "@/lib/api/errors";
-import type { AuthTokensDto, UserDto } from "@/lib/api/types";
+import type { AuthTokensDto } from "@/lib/api/types";
 import { backendFetch } from "@/lib/server/backend";
 import {
   clearAuthCookies,
@@ -10,7 +10,6 @@ import {
   setAuthCookies,
 } from "@/lib/server/session";
 import type { AuthFormState } from "./form-state";
-import { PERSONA_EMAILS } from "./persona-accounts";
 import { postLoginPath, sanitizeInternalPath } from "./routing";
 
 async function parseError(response: Response): Promise<AuthFormState> {
@@ -46,27 +45,6 @@ export async function loginAction(
   const tokens = (await response.json()) as AuthTokensDto;
   await setAuthCookies(tokens);
   redirect(postLoginPath(tokens.user, next));
-}
-
-// Login nyata untuk persona user-switcher. Password hanya dibaca server-side
-// dari SIGNIT_UAT_PASSWORD agar tidak pernah terekspos ke bundle browser.
-export async function loginPersonaAction(personaId: string): Promise<UserDto> {
-  const email = PERSONA_EMAILS[personaId];
-  if (!email) throw new Error("Persona tidak dikenal.");
-  const password = process.env.SIGNIT_UAT_PASSWORD;
-  if (!password) throw new Error("SIGNIT_UAT_PASSWORD belum dikonfigurasi pada frontend.");
-  const response = await backendFetch("/api/v1/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!response.ok) {
-    const error = await toApiError(response);
-    throw new Error(error.message);
-  }
-  const tokens = (await response.json()) as AuthTokensDto;
-  await setAuthCookies(tokens);
-  return tokens.user;
 }
 
 export async function logoutAction(): Promise<void> {

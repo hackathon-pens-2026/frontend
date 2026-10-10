@@ -7,7 +7,8 @@ export function backendBaseUrl(): string {
   }
   try {
     const base = new URL(configured);
-    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) {
+    if (!["http:", "https:"].includes(base.protocol) || base.username || base.password
+      || base.pathname !== "/" || base.search || base.hash) {
       throw new Error("invalid_origin");
     }
     return base.origin;

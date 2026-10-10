@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api/client";
-import { loginPersonaAction, logoutAction } from "@/lib/auth/actions";
+import { logoutAction } from "@/lib/auth/actions";
 import { DEMO_PERSONAS, personaToUserDto, type DemoPersona } from "@/lib/auth/personas";
 import { destinationByPosition, routeRedirect } from "./routing";
 import type { AssignmentDto, UiSurface, UserCapability, UserCategory, UserDto } from "@/lib/api/types";
@@ -58,37 +58,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [activePosition, setActivePosition] = useState<ActivePosition>(() =>
     extractActivePosition(personaToUserDto(DEMO_PERSONAS[0])),
   );
-  const [status, setStatus] = useState<SessionStatus>("authenticated");
-
-  // Pulihkan persona tersimpan lalu login nyata ke backend agar cookie sesi
-  // (pratinjau dokumen, chat, daftar surat) benar-benar tersedia.
-  useEffect(() => {
-    let active = true;
-    let savedPersonaId: string | null = null;
-    let savedPosition: string | null = null;
-    try {
-      savedPersonaId = localStorage.getItem("signit_active_persona");
-      savedPosition = localStorage.getItem("signit_active_position");
-    } catch {
-      // localStorage tidak tersedia
-    }
-    const found =
-      DEMO_PERSONAS.find((persona) => persona.id === savedPersonaId) ?? DEMO_PERSONAS[0];
-    loginPersonaAction(found.id)
-      .then((realUser) => {
-        if (!active) return;
-        setCurrentPersonaId(found.id);
-        setUser(realUser);
-        setActivePosition(extractActivePosition(realUser, savedPosition ?? undefined));
-        setStatus("authenticated");
-      })
-      .catch(() => {
-        // Tanpa sesi nyata, halaman menampilkan error jujur dari backend.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const [status, setStatus] = useState<SessionStatus>("loading");
+  const [accessKey, setAccessKey] = useState("");
+  const [selectionError, setSelectionError] = useState("");
 
   // Optional background sync with backend /me if a real backend session exists
   useEffect(() => {
@@ -96,13 +68,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     apiFetch<UserDto>("/me", { skipUnauthorizedEvent: true })
       .then((realUser) => {
         if (!active) return;
-        if (realUser?.name) {
+        const persona = DEMO_PERSONAS.find((item) => item.email.toLowerCase() === realUser.email.toLowerCase());
+        if (persona) {
+          setCurrentPersonaId(persona.id);
           setUser(realUser);
           setActivePosition(extractActivePosition(realUser));
+          setStatus("authenticated");
+        } else {
+          setStatus("unauthenticated");
         }
       })
       .catch(() => {
-        // Fallback gracefully to demo persona
+        if (active) setStatus("unauthenticated");
       });
 
     return () => {
@@ -119,42 +96,63 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   // Enforce role-based and position-based route access
   useEffect(() => {
+    if (status !== "authenticated") return;
     const redirect = routeRedirect(user, pathname);
     if (redirect && redirect !== pathname) {
       router.replace(redirect);
     }
-  }, [user, pathname, router]);
+  }, [user, pathname, router, status]);
 
-  // Ganti persona: login nyata ke backend memakai akun UAT persona tersebut,
-  // lalu arahkan ke tampilan sesuai jabatan.
+  // Switch user callback: updates persona & position, and auto-routes to appropriate view
   const switchUser = useCallback(
-    (personaId: string) => {
+    async (personaId: string) => {
       const target = DEMO_PERSONAS.find((p) => p.id === personaId);
       if (!target) return;
-      loginPersonaAction(target.id)
-        .then((realUser) => {
-          const newPos = extractActivePosition(realUser);
-          setCurrentPersonaId(target.id);
-          setUser(realUser);
-          setActivePosition(newPos);
-          setStatus("authenticated");
-          try {
-            localStorage.setItem("signit_active_persona", target.id);
-            localStorage.setItem("signit_active_position", newPos.positionCode);
-          } catch {
-            // Ignore
-          }
-          const destination = destinationByPosition(newPos.positionCode, realUser.uiSurface);
-          if (destination && destination !== pathname) {
-            router.push(destination);
-          }
-        })
-        .catch(() => {
-          // Login persona gagal (env/seed belum siap); halaman akan
-          // menampilkan error jujur dari endpoint backend.
+
+      if (!accessKey) {
+        setSelectionError("Masukkan kode akses UAT untuk mengganti akun backend.");
+        setStatus("unauthenticated");
+        return;
+      }
+      setStatus("loading");
+      setSelectionError("");
+      let dto: UserDto;
+      try {
+        const response = await fetch("/api/uat/select-account", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ personaId, accessKey }), cache: "no-store",
         });
+        if (!response.ok) {
+          const failure = await response.json();
+          throw new Error(failure.detail || "Akun belum dapat dipilih.");
+        }
+        dto = await response.json();
+      } catch (cause) {
+        setSelectionError(cause instanceof Error ? cause.message : "Akun belum dapat dipilih.");
+        setStatus("unauthenticated");
+        return;
+      }
+      setCurrentPersonaId(target.id);
+      const newPos = extractActivePosition(dto);
+
+      setUser(dto);
+      setActivePosition(newPos);
+      setStatus("authenticated");
+
+      try {
+        localStorage.setItem("signit_active_persona", target.id);
+        localStorage.setItem("signit_active_position", newPos.positionCode);
+      } catch {
+        // Ignore
+      }
+
+      // Auto-navigate to the optimal destination according to the new position
+      const destination = destinationByPosition(newPos.positionCode, target.uiSurface);
+      if (destination && destination !== pathname) {
+        router.push(destination);
+      }
     },
-    [pathname, router],
+    [pathname, router, accessKey],
   );
 
   // Switch position callback (for users with multiple assignments)
@@ -176,7 +174,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(async () => {
-    setStatus("authenticated");
+    const dto = await apiFetch<UserDto>("/me", { skipUnauthorizedEvent: true });
+    setUser(dto);
+    setActivePosition(extractActivePosition(dto));
   }, []);
 
   const logout = useCallback(async () => {
@@ -208,7 +208,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [status, user, activePosition, refresh, logout, currentPersonaId, switchUser, switchPosition],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={value}>
+    {status === "authenticated" ? <div key={user.id}>{children}</div> :
+      <main className="mx-auto max-w-lg space-y-4 px-5 py-16 text-midnight">
+        <h1 className="text-title font-semibold">Pilih akun</h1>
+        <p className="text-body">Akses UAT terbatas. Pilihan akun menggunakan identitas dan izin dari backend.</p>
+        {status === "loading" ? <p role="status">Menghubungkan akun backend…</p> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void switchUser(currentPersonaId); }}>
+          <label className="block">Akun<select className="mt-2 block w-full rounded-lg border border-line bg-surface p-3" value={currentPersonaId} onChange={(event) => setCurrentPersonaId(event.target.value)}>{DEMO_PERSONAS.map((persona) => <option key={persona.id} value={persona.id}>{persona.name} — {persona.positionName}</option>)}</select></label>
+          <label className="block">Kode akses UAT<input type="password" autoComplete="off" required className="mt-2 block w-full rounded-lg border border-line bg-surface p-3" value={accessKey} onChange={(event) => setAccessKey(event.target.value)} /></label>
+          {selectionError && <p role="alert">{selectionError}</p>}
+          <button className="min-h-11 rounded-lg bg-navy px-5 text-surface" type="submit">Gunakan akun</button>
+        </form>}
+      </main>}
+  </SessionContext.Provider>;
 }
 
 export function useSession(): SessionValue {

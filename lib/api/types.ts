@@ -215,6 +215,7 @@ export interface LetterSummaryDto {
 }
 
 export interface LetterListDto {
+  statusCounts?: Record<string, number>;
   page: number;
   pageSize: number;
   total: number;

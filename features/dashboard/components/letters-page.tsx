@@ -12,6 +12,7 @@ import { saveBlob } from "@/lib/display/download";
 import { toDashboardLetter } from "../adapters";
 import { DashboardLetter, FilterStatus } from "../types";
 import { useSession } from "@/lib/auth/session-provider";
+import { verifyAccount } from "@/lib/api/account-data";
 
 export function LettersPage() {
   const { user, status: sessionStatus } = useSession();
@@ -43,7 +44,7 @@ export function LettersPage() {
     Promise.resolve().then(() => {
       if (active) { setLoading(true); setDataAvailable(false); setLetters([]); }
     });
-    listMyLetters(1, 100)
+    verifyAccount(user.id).then(() => listMyLetters(1, 100))
       .then((result) => {
         if (!active) return;
         setLetters(result.items.map(toDashboardLetter));

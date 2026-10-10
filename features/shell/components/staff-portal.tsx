@@ -14,6 +14,7 @@ import { DelegationView } from "@/features/delegation/components/delegation-view
 import { listMyLetters } from "@/lib/api/letters";
 import { getLetterWorkflow, listMyTasks } from "@/lib/api/workflow";
 import { useSession } from "@/lib/auth/session-provider";
+import { verifyAccount } from "@/lib/api/account-data";
 import type { LetterSummaryDto, WorkflowTaskDto } from "@/lib/api/types";
 
 export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }) {
@@ -41,8 +42,9 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
   useEffect(() => {
     if (sessionStatus !== "authenticated" || !user?.id) return;
     let active = true;
-    Promise.resolve().then(() => {
+    Promise.resolve().then(async () => {
       if (active) setTasksLoading(true);
+      await verifyAccount(user.id);
       return listMyTasks(1, 100);
     })
       .then((queue) => {
@@ -81,7 +83,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
     Promise.resolve().then(() => {
       if (active) { setLettersLoading(true); setLetters([]); }
     });
-    listMyLetters(1, 50)
+    verifyAccount(user.id).then(() => listMyLetters(1, 100))
       .then((result) => {
         if (active) { setLetters(result.items); setLettersError(null); }
       })

@@ -53,3 +53,16 @@ test("backend refusal, network failure and identity mismatch never set cookies",
     assert.equal(harness.cookies.length, 0);
   }
 });
+test("public configured origin works behind a proxy and other origins remain blocked", async () => {
+  const harness = setup({ ...env, FRONTEND_ORIGIN: "https://public.example" });
+  assert.equal((await harness.post({ accessKey: key, personaId: "pengaju" }, "https://public.example")).status, 200);
+  assert.equal((await harness.post({ accessKey: key, personaId: "pengaju" })).status, 403);
+  assert.equal(harness.calls.length, 1);
+});
+test("invalid configured origins fail closed", async () => {
+  for (const origin of ["invalid", "https://public.example/path", "https://user:password@public.example", "https://public.example?x=1"]) {
+    const harness = setup({ ...env, FRONTEND_ORIGIN: origin });
+    assert.equal((await harness.post({ accessKey: key, personaId: "pengaju" })).status, 503);
+    assert.equal(harness.calls.length, 0);
+  }
+});

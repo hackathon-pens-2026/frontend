@@ -11,7 +11,18 @@ export async function POST(request: Request) {
   const key = process.env.UAT_ACCESS_KEY;
   const password = process.env.UAT_ACCOUNT_PASSWORD;
   if (!key || key.length < 32 || !password) return reply("Konfigurasi akses UAT belum lengkap.", 503);
-  if (request.headers.get("origin") !== new URL(request.url).origin) return reply("Asal permintaan tidak diizinkan.", 403);
+  // Use the configured public origin behind TLS-terminating proxies, not client-supplied forwarded headers.
+  let expectedOrigin = new URL(request.url).origin;
+  if (process.env.FRONTEND_ORIGIN) {
+    try {
+      const configured = new URL(process.env.FRONTEND_ORIGIN);
+      if (!["http:", "https:"].includes(configured.protocol) || configured.username || configured.password || configured.pathname !== "/" || configured.search || configured.hash) {
+        return reply("Konfigurasi origin frontend tidak valid.", 503);
+      }
+      expectedOrigin = configured.origin;
+    } catch { return reply("Konfigurasi origin frontend tidak valid.", 503); }
+  }
+  if (request.headers.get("origin") !== expectedOrigin) return reply("Asal permintaan tidak diizinkan.", 403);
   let input: { personaId?: string; accessKey?: string };
   try { input = await request.json(); } catch { return reply("Permintaan tidak valid.", 400); }
   const hash = (value: string) => createHash("sha256").update(value).digest();

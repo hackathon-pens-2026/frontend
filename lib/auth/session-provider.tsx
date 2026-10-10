@@ -58,32 +58,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     extractActivePosition(personaToUserDto(DEMO_PERSONAS[0])),
   );
   const [status, setStatus] = useState<SessionStatus>("loading");
-  const [accessKey, setAccessKeyState] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        return sessionStorage.getItem("signit_uat_access_key") ?? "";
-      } catch {
-        return "";
-      }
-    }
-    return "";
-  });
-
-  const setAccessKey = useCallback((key: string) => {
-    setAccessKeyState(key);
-    if (typeof window !== "undefined") {
-      try {
-        if (key) {
-          sessionStorage.setItem("signit_uat_access_key", key);
-        } else {
-          sessionStorage.removeItem("signit_uat_access_key");
-        }
-      } catch {
-        // Ignore
-      }
-    }
-  }, []);
-
+  const [accessKey, setAccessKey] = useState("");
   const [selectionError, setSelectionError] = useState("");
 
   // Optional background sync with backend /me if a real backend session exists
@@ -149,13 +124,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const target = DEMO_PERSONAS.find((p) => p.id === personaId);
       if (!target) return;
 
-      const effectiveKey =
-        accessKey ||
-        (typeof window !== "undefined"
-          ? sessionStorage.getItem("signit_uat_access_key") ?? ""
-          : "");
-
-      if (!effectiveKey) {
+      if (!accessKey) {
         setCurrentPersonaId(target.id);
         setSelectionError("Masukkan kode akses UAT untuk mengganti akun backend.");
         setStatus("unauthenticated");
@@ -166,16 +135,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       let dto: UserDto;
       try {
         const response = await fetch("/api/uat/select-account", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ personaId, accessKey: effectiveKey }),
-          cache: "no-store",
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ personaId, accessKey }), cache: "no-store",
         });
         if (!response.ok) {
           const failure = await response.json();
-          if (response.status === 403) {
-            setAccessKey("");
-          }
           throw new Error(failure.detail || "Akun belum dapat dipilih.");
         }
         dto = await response.json();
@@ -184,7 +148,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStatus("unauthenticated");
         return;
       }
-      setAccessKey(effectiveKey);
       setCurrentPersonaId(target.id);
       const newPos = extractActivePosition(dto);
 
@@ -205,7 +168,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         router.push(destination);
       }
     },
-    [pathname, router, accessKey, setAccessKey],
+    [pathname, router, accessKey],
   );
 
   // Switch position callback (for users with multiple assignments)
@@ -239,7 +202,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setAccessKey("");
       setStatus("unauthenticated");
     }
-  }, [setAccessKey]);
+  }, []);
 
   const value = useMemo<SessionValue>(
     () => ({

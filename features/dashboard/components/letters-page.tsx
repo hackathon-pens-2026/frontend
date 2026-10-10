@@ -15,7 +15,7 @@ import { useSession } from "@/lib/auth/session-provider";
 import { verifyAccount } from "@/lib/api/account-data";
 
 export function LettersPage() {
-  const { user, status: sessionStatus, currentPersonaId } = useSession();
+  const { user, status: sessionStatus } = useSession();
   const router = useRouter();
   const [letters, setLetters] = useState<DashboardLetter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ export function LettersPage() {
     return () => {
       active = false;
     };
-  }, [reloadKey, user?.id, currentPersonaId, sessionStatus]);
+  }, [reloadKey, user?.id, sessionStatus]);
 
   const handleDownload = useCallback(
     async (letter: DashboardLetter) => {

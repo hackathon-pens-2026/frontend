@@ -99,7 +99,7 @@ export function StaffPortal({ studentInbox = false }: { studentInbox?: boolean }
     return () => {
       active = false;
     };
-  }, [refreshKey, user?.id, currentPersonaId, sessionStatus]);
+  }, [refreshKey, user?.id, sessionStatus]);
 
   const refresh = useCallback(async () => {
     setRefreshKey((key) => key + 1);

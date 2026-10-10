@@ -64,7 +64,7 @@ export function routeRedirect(user: UserDto, pathname: string): string | null {
   // Path /manajemen - Khusus Manajemen
   if (pathname === "/manajemen" || pathname.startsWith("/manajemen/")) {
     if (!isManagement) {
-      return "/";
+      return canSignOrApprove ? "/persetujuan" : "/";
     }
   }
 
